@@ -12,11 +12,29 @@ interface Message {
   content: string;
 }
 
-export const ChatBox = () => {
+interface ChatBoxProps {
+  chatId?: string; // This fixes the TypeScript error
+}
+
+export const ChatBox = ({ chatId }: ChatBoxProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Effect to load messages when a chat is selected
+  useEffect(() => {
+    if (chatId) {
+      const loadChat = async () => {
+        const res = await fetch(`/api/chat/${chatId}`);
+        const data = await res.json();
+        if (data.messages) setMessages(data.messages);
+      };
+      loadChat();
+    } else {
+      setMessages([]);
+    }
+  }, [chatId]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -31,11 +49,12 @@ export const ChatBox = () => {
     if (!input.trim() || isLoading) return;
 
     const userMessage: Message = { role: "user", content: input };
-    setMessages((prev) => [...prev, userMessage]);
+    const currentMessages = [...messages, userMessage];
+    setMessages(currentMessages);
     setInput("");
     setIsLoading(true);
 
-    // Placeholder for assistant
+    // Initial placeholder for assistant
     setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
 
     try {
@@ -43,7 +62,7 @@ export const ChatBox = () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
-          messages: [...messages, userMessage],
+          messages: currentMessages,
           modelType: "text"
         }),
       });
@@ -63,6 +82,17 @@ export const ChatBox = () => {
           const updated = [...prev];
           updated[updated.length - 1] = { role: "assistant", content: streamContent };
           return updated;
+        });
+      }
+
+      // Save to database if we have a chatId
+      if (chatId) {
+        await fetch(`/api/chat/${chatId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ 
+            messages: [...currentMessages, { role: "assistant", content: streamContent }] 
+          }),
         });
       }
     } catch (error) {
@@ -92,7 +122,7 @@ export const ChatBox = () => {
         </AnimatePresence>
       </div>
 
-      <div className="mt-auto relative max-w-3xl mx-auto w-full">
+      <div className="mt-auto relative max-w-3xl mx-auto w-full group">
         <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl blur opacity-10 group-focus-within:opacity-25 transition"></div>
         <div className="relative glass-card rounded-2xl p-2 flex items-end gap-2">
           <Input
@@ -111,9 +141,6 @@ export const ChatBox = () => {
             {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
           </Button>
         </div>
-        <p className="text-[10px] text-center mt-2 text-white/30">
-          AI Nexus can make mistakes. Check important info.
-        </p>
       </div>
     </div>
   );
