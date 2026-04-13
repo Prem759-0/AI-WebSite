@@ -26,6 +26,11 @@ export async function POST(req: Request) {
       }),
     });
 
+    // app/api/ai/route.ts
+// Add this inside the while loop to see the raw data:
+const chunk = decoder.decode(value);
+console.log("Raw Chunk:", chunk); // This will show in your terminal
+
     // Create a ReadableStream to pipe OpenRouter response to the client
     const stream = new ReadableStream({
       async start(controller) {
