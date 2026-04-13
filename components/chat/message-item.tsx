@@ -32,7 +32,16 @@ export const MessageItem = ({ role, content }: MessageItemProps) => {
           ? "bg-blue-600 text-white rounded-tr-none shadow-[0_0_20px_rgba(37,99,235,0.2)]" 
           : "glass-card text-gray-100 rounded-tl-none"
       )}>
-        {content || <span className="animate-pulse">...</span>}
+        {/* If content is empty and it's the assistant, show the bouncing dots */}
+        {!isUser && content === "" ? (
+          <div className="flex gap-1 py-1 items-center h-5">
+            <span className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+            <span className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+            <span className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce"></span>
+          </div>
+        ) : (
+          content
+        )}
       </div>
     </motion.div>
   );
