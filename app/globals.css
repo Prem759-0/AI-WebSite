@@ -5,43 +5,48 @@
 :root {
   --background: 240 10% 3.9%;
   --foreground: 0 0% 98%;
-  --primary: 217.2 91.2% 59.8%;
-  --accent: 263.4 70% 50.4%;
 }
 
 body {
-  background: radial-gradient(circle at top center, #1a1a2e 0%, #0b0b0f 100%);
+  background: #050508;
   color: hsl(var(--foreground));
-  min-height: 100vh;
+  overflow-x: hidden;
 }
 
-/* Glassmorphism utility */
-.glass-card {
-  background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(16px);
+/* Elite Glass Effect */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.01);
+  backdrop-filter: blur(20px) saturate(180%);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
 }
 
-.glass-input {
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+.glass-card-hover {
   transition: all 0.3s ease;
 }
 
-.glass-input:focus {
-  background: rgba(255, 255, 255, 0.08);
+.glass-card-hover:hover {
+  background: rgba(255, 255, 255, 0.05);
   border-color: rgba(59, 130, 246, 0.5);
+  transform: translateY(-2px);
 }
 
-/* Custom scrollbar */
+/* Animated Background Glow */
+.bg-glow {
+  position: fixed;
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(37, 99, 235, 0.15) 0%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: -1;
+  filter: blur(80px);
+}
+
 ::-webkit-scrollbar {
-  width: 5px;
+  width: 4px;
 }
-::-webkit-scrollbar-track {
-  background: transparent;
-}
+
 ::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.1);
   border-radius: 10px;
