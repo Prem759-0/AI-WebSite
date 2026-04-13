@@ -2,17 +2,25 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 export function middleware(request: NextRequest) {
-  const token = request.cookies.get('auth-token');
+  // Check for the auth token in cookies
+  const token = request.cookies.get('auth-token')?.value;
 
-  // If trying to access chat without token, redirect to login
-  // (We'll assume the login page is the root for now or a /login route)
-  if (!token && request.nextUrl.pathname.startsWith('/api/chat')) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // Paths that require authentication
+  const isProtectedRoute = 
+    request.nextUrl.pathname.startsWith('/api/ai') || 
+    request.nextUrl.pathname.startsWith('/api/chat');
+
+  if (isProtectedRoute && !token) {
+    return NextResponse.json(
+      { error: 'Authentication required' },
+      { status: 401 }
+    );
   }
 
   return NextResponse.next();
 }
 
+// Ensure the middleware only runs on specific API routes to save performance
 export const config = {
-  matcher: ['/api/chat/:path*', '/api/ai/:path*'],
+  matcher: ['/api/ai/:path*', '/api/chat/:path*'],
 };
