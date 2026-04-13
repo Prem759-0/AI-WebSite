@@ -5,32 +5,46 @@ export async function POST(req: Request) {
     const { prompt } = await req.json();
     const apiKey = process.env.OPENROUTER_API_KEY;
 
-    if (!apiKey) throw new Error("API Key missing");
+    if (!apiKey) {
+      return NextResponse.json({ error: "API Key is missing" }, { status: 500 });
+    }
 
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${apiKey}`,
         "Content-Type": "application/json",
+        "HTTP-Referer": "http://localhost:3000", // Required by some OpenRouter models
+        "X-Title": "AI Nexus"
       },
       body: JSON.stringify({
-        model: "openai/dall-e-3",
-        messages: [{ role: "user", content: prompt }],
+        // Using Flux or Stable Diffusion for better reliability via OpenRouter
+        model: "black-forest-labs/flux-1-schnell", 
+        messages: [
+          {
+            role: "user",
+            content: `Generate a high-quality image of: ${prompt}. Return ONLY the direct URL of the image.`
+          }
+        ],
       }),
     });
 
     const data = await response.json();
     
-    // Fail-safe URL check
-    const url = data.choices?.[0]?.message?.content || data.choices?.[0]?.message?.url;
-    
+    // OpenRouter Image models usually put the URL in the content 
+    // or a specific field depending on the provider.
+    let url = data.choices?.[0]?.message?.content?.trim();
+
+    // Basic check: If it doesn't look like a URL, it might be an error or text description
     if (!url || !url.startsWith("http")) {
-       return NextResponse.json({ error: "Model failed to provide a valid image URL" }, { status: 500 });
+      console.error("Model response was not a URL:", url);
+      return NextResponse.json({ 
+        error: "Model provided text instead of a URL. Please try a different prompt." 
+      }, { status: 500 });
     }
 
     return NextResponse.json({ url });
   } catch (error: any) {
-    console.error("Image API Error:", error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "Generation failed: " + error.message }, { status: 500 });
   }
 }
