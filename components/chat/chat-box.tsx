@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { MessageItem } from "./message-item";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Send, Loader2, Sparkles } from "lucide-react";
+import { Send, Loader2, Sparkles, Mic, Image as ImageIcon, Paperclip } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface Message {
@@ -12,91 +12,71 @@ interface Message {
   content: string;
 }
 
-interface ChatBoxProps {
-  chatId?: string; // This fixes the TypeScript error
-}
-
-export const ChatBox = ({ chatId }: ChatBoxProps) => {
+export const ChatBox = ({ chatId }: { chatId?: string }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isListening, setIsListening] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Effect to load messages when a chat is selected
-  useEffect(() => {
-    if (chatId) {
-      const loadChat = async () => {
-        const res = await fetch(`/api/chat/${chatId}`);
-        const data = await res.json();
-        if (data.messages) setMessages(data.messages);
-      };
-      loadChat();
-    } else {
-      setMessages([]);
-    }
-  }, [chatId]);
+  // Voice Input Logic
+  const handleVoiceInput = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) return alert("Browser does not support speech recognition.");
 
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTo({
-        top: scrollRef.current.scrollHeight,
-        behavior: "smooth"
-      });
-    }
-  }, [messages]);
+    const recognition = new SpeechRecognition();
+    recognition.onstart = () => setIsListening(true);
+    recognition.onend = () => setIsListening(false);
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      setInput(transcript);
+    };
+    recognition.start();
+  };
 
-  const sendMessage = async () => {
+  const sendMessage = async (type: "text" | "image" = "text") => {
     if (!input.trim() || isLoading) return;
 
     const userMessage: Message = { role: "user", content: input };
-    const currentMessages = [...messages, userMessage];
-    setMessages(currentMessages);
+    setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setIsLoading(true);
 
-    // Initial placeholder for assistant
-    setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
-
     try {
-      const response = await fetch("/api/ai", {
+      const endpoint = type === "image" ? "/api/image" : "/api/ai";
+      const response = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
-          messages: currentMessages,
+          messages: type === "text" ? [...messages, userMessage] : undefined,
+          prompt: type === "image" ? input : undefined,
           modelType: "text"
         }),
       });
 
-      if (!response.body) throw new Error("No response body");
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let streamContent = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        streamContent += decoder.decode(value);
-        setMessages((prev) => {
-          const updated = [...prev];
-          updated[updated.length - 1] = { role: "assistant", content: streamContent };
-          return updated;
-        });
-      }
-
-      // Save to database if we have a chatId
-      if (chatId) {
-        await fetch(`/api/chat/${chatId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ 
-            messages: [...currentMessages, { role: "assistant", content: streamContent }] 
-          }),
-        });
+      if (type === "image") {
+        const data = await response.json();
+        setMessages((prev) => [...prev, { role: "assistant", content: `![Generated Image](${data.url})` }]);
+      } else {
+        // ... (Existing streaming logic from Phase 6)
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+        setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+        
+        let content = "";
+        while (reader) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          content += decoder.decode(value);
+          setMessages((prev) => {
+            const updated = [...prev];
+            updated[updated.length - 1].content = content;
+            return updated;
+          });
+        }
       }
     } catch (error) {
-      console.error("Chat error:", error);
+      console.error(error);
     } finally {
       setIsLoading(false);
     }
@@ -104,42 +84,43 @@ export const ChatBox = ({ chatId }: ChatBoxProps) => {
 
   return (
     <div className="flex flex-col h-full max-w-5xl mx-auto w-full px-4 pb-6">
-      <div 
-        ref={scrollRef}
-        className="flex-1 overflow-y-auto pt-8 pb-4 space-y-2"
-      >
+      <div ref={scrollRef} className="flex-1 overflow-y-auto pt-8 pb-4 space-y-2 scrollbar-hide">
         {messages.length === 0 && (
-          <div className="h-full flex flex-col items-center justify-center text-center opacity-50">
-            <Sparkles size={48} className="mb-4 text-blue-500" />
-            <h2 className="text-xl font-semibold">How can I help you today?</h2>
-            <p className="text-sm">Start a conversation with AI Nexus</p>
+          <div className="h-full flex flex-col items-center justify-center text-center opacity-40">
+            <Sparkles size={40} className="mb-4 text-blue-500" />
+            <h2 className="text-lg font-medium">Nexus Intelligence</h2>
           </div>
         )}
         <AnimatePresence mode="popLayout">
-          {messages.map((m, i) => (
-            <MessageItem key={i} role={m.role} content={m.content} />
-          ))}
+          {messages.map((m, i) => <MessageItem key={i} role={m.role} content={m.content} />)}
         </AnimatePresence>
       </div>
 
       <div className="mt-auto relative max-w-3xl mx-auto w-full group">
-        <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl blur opacity-10 group-focus-within:opacity-25 transition"></div>
-        <div className="relative glass-card rounded-2xl p-2 flex items-end gap-2">
+        <div className="relative glass-card rounded-2xl p-2 flex flex-col gap-2">
           <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
-            placeholder="Ask anything..."
-            className="glass-input border-none ring-0 focus-visible:ring-0 min-h-[44px] py-3"
-            disabled={isLoading}
+            onKeyDown={(e) => e.key === "Enter" && sendMessage()}
+            placeholder="Ask or generate an image..."
+            className="glass-input border-none ring-0 focus-visible:ring-0 min-h-[44px]"
           />
-          <Button 
-            onClick={sendMessage} 
-            disabled={isLoading || !input.trim()}
-            className="rounded-xl h-11 w-11 p-0 bg-blue-600 hover:bg-blue-500 transition-all shrink-0"
-          >
-            {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
-          </Button>
+          <div className="flex items-center justify-between px-2 pb-1">
+            <div className="flex gap-2">
+              <Button size="icon" variant="ghost" onClick={() => {}} className="w-8 h-8 text-white/40 hover:text-white">
+                <Paperclip size={18} />
+              </Button>
+              <Button size="icon" variant="ghost" onClick={handleVoiceInput} className={isListening ? "text-red-500" : "text-white/40"}>
+                <Mic size={18} />
+              </Button>
+              <Button size="icon" variant="ghost" onClick={() => sendMessage("image")} className="text-white/40 hover:text-blue-400">
+                <ImageIcon size={18} />
+              </Button>
+            </div>
+            <Button onClick={() => sendMessage()} disabled={isLoading} className="rounded-xl h-10 px-4 bg-blue-600">
+              {isLoading ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
+            </Button>
+          </div>
         </div>
       </div>
     </div>
