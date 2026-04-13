@@ -12,23 +12,24 @@ export async function POST(req: Request) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "openai/dall-e-3", // Ensure your OpenRouter account has access/credits
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "text", text: `Generate an image based on: ${prompt}` }
-            ]
-          }
-        ],
+        model: "openai/dall-e-3", 
+        messages: [{ role: "user", content: prompt }],
       }),
     });
 
     const data = await response.json();
-    // OpenRouter usually returns the image URL in the content or as a specific field
-    const imageUrl = data.choices[0]?.message?.content || data.choices[0]?.message?.url;
+    
+    // Fail-safe URL extraction
+    const url = data.choices?.[0]?.message?.content || 
+                data.choices?.[0]?.message?.url || 
+                data.data?.[0]?.url;
 
-    return NextResponse.json({ url: imageUrl });
+    if (!url) {
+      console.error("OpenRouter returned no URL:", data);
+      return NextResponse.json({ error: "No image URL returned" }, { status: 500 });
+    }
+
+    return NextResponse.json({ url });
   } catch (error) {
     return NextResponse.json({ error: "Image generation failed" }, { status: 500 });
   }
