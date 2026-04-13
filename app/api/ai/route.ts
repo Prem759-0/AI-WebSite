@@ -22,14 +22,52 @@ export async function POST(req: Request) {
       body: JSON.stringify({
         model: models[modelType as keyof typeof models] || models.text,
         messages: messages,
+        stream: true, // Enable streaming
       }),
     });
 
-    const data = await response.json();
-    const content = data.choices[0].message.content;
+    // Create a ReadableStream to pipe OpenRouter response to the client
+    const stream = new ReadableStream({
+      async start(controller) {
+        if (!response.body) {
+          controller.close();
+          return;
+        }
 
-    return NextResponse.json({ content });
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split("\n").filter((line) => line.trim() !== "");
+
+          for (const line of lines) {
+            if (line.includes("[DONE]")) {
+              controller.close();
+              return;
+            }
+            if (line.startsWith("data: ")) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                const content = data.choices[0]?.delta?.content || "";
+                if (content) {
+                  controller.enqueue(new TextEncoder().encode(content));
+                }
+              } catch (e) {
+                console.error("Error parsing stream chunk", e);
+              }
+            }
+          }
+        }
+        controller.close();
+      },
+    });
+
+    return new Response(stream);
   } catch (error) {
-    return NextResponse.json({ error: "Failed to fetch AI response" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to stream AI response" }, { status: 500 });
   }
 }
