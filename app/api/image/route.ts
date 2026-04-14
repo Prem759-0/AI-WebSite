@@ -5,7 +5,9 @@ export async function POST(req: Request) {
     const { prompt } = await req.json();
     const apiKey = process.env.OPENROUTER_API_KEY;
 
-    if (!apiKey) return NextResponse.json({ error: "API Key is missing" }, { status: 500 });
+    if (!apiKey) {
+      return NextResponse.json({ error: "API Key is missing from Vercel/env" }, { status: 500 });
+    }
 
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
@@ -16,8 +18,8 @@ export async function POST(req: Request) {
         "X-Title": "AI Nexus"
       },
       body: JSON.stringify({
-        // Switched to Bytedance Seedream 4.5
-        model: "bytedance-seed/seedream-4.5", 
+        // Updated to your exact requested model
+        model: "sourceful/riverflow-v2-pro", 
         messages: [{
           role: "user",
           content: `Generate an image based on this exact prompt: "${prompt}". Return ONLY a direct, working image URL. No extra text.`
@@ -25,17 +27,29 @@ export async function POST(req: Request) {
       }),
     });
 
+    // Check if OpenRouter rejected the request (e.g., out of credits)
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error("OpenRouter Error:", errorData);
+      return NextResponse.json({ 
+        error: errorData.error?.message || `OpenRouter API Error: ${response.status}` 
+      }, { status: response.status });
+    }
+
     const data = await response.json();
     let url = data.choices?.[0]?.message?.content?.trim();
 
+    // Validate that the model actually returned a URL
     if (!url || !url.startsWith("http")) {
+      console.error("Model did not return a URL. It returned:", url);
       return NextResponse.json({ 
-        error: "Image generation failed. Please try a different prompt or check API credits." 
+        error: "The model returned text instead of an image URL. Please try a different prompt." 
       }, { status: 500 });
     }
 
     return NextResponse.json({ url });
   } catch (error: any) {
-    return NextResponse.json({ error: "Generation failed: " + error.message }, { status: 500 });
+    console.error("Image Route Catch Error:", error);
+    return NextResponse.json({ error: "Server failed: " + error.message }, { status: 500 });
   }
 }
