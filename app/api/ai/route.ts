@@ -1,16 +1,12 @@
 import { NextResponse } from "next/server";
-import { MODEL_MAP, detectIntent } from "@/lib/ai-router";
-import connectToDatabase from "@/lib/mongodb";
-import Usage from "@/models/Usage";
+import { MODEL_MAP, detectType } from "@/lib/ai-router";
 
 export async function POST(req: Request) {
   try {
-    await connectToDatabase();
     const { messages } = await req.json();
     const lastMsg = messages[messages.length - 1].content;
-    
-    const intent = detectIntent(lastMsg);
-    const model = MODEL_MAP[intent];
+    const type = detectType(lastMsg);
+    const model = MODEL_MAP[type] || MODEL_MAP.text;
 
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
@@ -21,8 +17,7 @@ export async function POST(req: Request) {
       body: JSON.stringify({ model, messages, stream: true }),
     });
 
-    // Record usage asynchronously (don't block the stream)
-    Usage.create({ modelName: model, intent }).catch(console.error);
+    if (!response.ok) throw new Error(`OpenRouter Error: ${response.status}`);
 
     const stream = new ReadableStream({
       async start(controller) {
@@ -49,7 +44,7 @@ export async function POST(req: Request) {
     });
 
     return new Response(stream);
-  } catch (error) {
-    return NextResponse.json({ error: "Intelligence Layer Error" }, { status: 500 });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
