@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { MODEL_MAP, detectIntent } from "@/lib/ai-router";
-import connectToDatabase from "@/lib/mongodb"; // using your existing mongodb file
+import connectToDatabase from "@/lib/mongodb";
 import Usage from "@/models/Usage";
 
 export async function POST(req: Request) {
