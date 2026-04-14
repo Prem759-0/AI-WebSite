@@ -1,13 +1,22 @@
 import { NextResponse } from "next/server";
-import { MODEL_MAP, detectType } from "@/lib/ai-router";
+import { MODEL_MAP, detectIntent } from "@/lib/ai-router";
+import connectToDatabase from "@/lib/mongodb"; // using your existing mongodb file
+import Usage from "@/models/Usage";
 
 export async function POST(req: Request) {
   try {
+    // 1. Connect to DB for usage tracking
+    await connectToDatabase();
+    
+    // 2. Extract messages
     const { messages } = await req.json();
     const lastMsg = messages[messages.length - 1].content;
-    const type = detectType(lastMsg);
-    const model = MODEL_MAP[type] || MODEL_MAP.text;
+    
+    // 3. Detect intent and map to model
+    const intent = detectIntent(lastMsg);
+    const model = MODEL_MAP[intent] || MODEL_MAP.text;
 
+    // 4. Call OpenRouter API
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -17,8 +26,14 @@ export async function POST(req: Request) {
       body: JSON.stringify({ model, messages, stream: true }),
     });
 
-    if (!response.ok) throw new Error(`OpenRouter Error: ${response.status}`);
+    if (!response.ok) {
+      throw new Error(`OpenRouter Error: ${response.status}`);
+    }
 
+    // 5. Async usage tracking (doesn't block the response)
+    Usage.create({ modelName: model, intent }).catch(console.error);
+
+    // 6. Stream the response
     const stream = new ReadableStream({
       async start(controller) {
         const reader = response.body?.getReader();
@@ -45,6 +60,7 @@ export async function POST(req: Request) {
 
     return new Response(stream);
   } catch (error: any) {
+    console.error("AI API Error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
