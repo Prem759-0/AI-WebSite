@@ -16,7 +16,8 @@ export async function POST(req: Request) {
         "X-Title": "AI Nexus"
       },
       body: JSON.stringify({
-        model: "black-forest-labs/flux-1-schnell", // Fast & highly reliable image model
+        // Switched to Bytedance Seedream 4.5
+        model: "bytedance-seed/seedream-4.5", 
         messages: [{
           role: "user",
           content: `Generate an image based on this exact prompt: "${prompt}". Return ONLY a direct, working image URL. No extra text.`
