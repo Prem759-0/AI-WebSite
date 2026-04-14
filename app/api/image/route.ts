@@ -6,7 +6,7 @@ export async function POST(req: Request) {
     const apiKey = process.env.OPENROUTER_API_KEY;
 
     if (!apiKey) {
-      return NextResponse.json({ error: "API Key is missing from Vercel/env" }, { status: 500 });
+      return NextResponse.json({ error: "API Key is missing" }, { status: 500 });
     }
 
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -18,38 +18,37 @@ export async function POST(req: Request) {
         "X-Title": "AI Nexus"
       },
       body: JSON.stringify({
-        // Updated to your exact requested model
-        model: "sourceful/riverflow-v2-pro", 
+        model: "sourceful/riverflow-v2-pro", // Or bytedance-seed/seedream-4.5
         messages: [{
           role: "user",
-          content: `Generate an image based on this exact prompt: "${prompt}". Return ONLY a direct, working image URL. No extra text.`
+          content: `Generate an image based on this exact prompt: "${prompt}". You must reply with ONLY the raw image URL starting with http. No formatting, no markdown.`
         }],
       }),
     });
 
-    // Check if OpenRouter rejected the request (e.g., out of credits)
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      console.error("OpenRouter Error:", errorData);
       return NextResponse.json({ 
         error: errorData.error?.message || `OpenRouter API Error: ${response.status}` 
       }, { status: response.status });
     }
 
     const data = await response.json();
-    let url = data.choices?.[0]?.message?.content?.trim();
+    const rawContent = data.choices?.[0]?.message?.content?.trim() || "";
 
-    // Validate that the model actually returned a URL
-    if (!url || !url.startsWith("http")) {
-      console.error("Model did not return a URL. It returned:", url);
+    // ULTRA-ROBUST URL EXTRACTOR: Finds the http link even if it's buried in text/markdown
+    const urlMatch = rawContent.match(/https?:\/\/[^\s)\]"]+/);
+    const extractedUrl = urlMatch ? urlMatch[0] : null;
+
+    if (!extractedUrl) {
+      console.error("Model did not return a URL. It returned:", rawContent);
       return NextResponse.json({ 
-        error: "The model returned text instead of an image URL. Please try a different prompt." 
+        error: "Model returned text instead of an image. Try a different prompt." 
       }, { status: 500 });
     }
 
-    return NextResponse.json({ url });
+    return NextResponse.json({ url: extractedUrl });
   } catch (error: any) {
-    console.error("Image Route Catch Error:", error);
     return NextResponse.json({ error: "Server failed: " + error.message }, { status: 500 });
   }
 }
