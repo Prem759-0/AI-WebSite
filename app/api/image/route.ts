@@ -18,7 +18,7 @@ export async function POST(req: Request) {
         "X-Title": "AI Nexus"
       },
       body: JSON.stringify({
-        model: "sourceful/riverflow-v2-pro", // Or bytedance-seed/seedream-4.5
+        model: "bytedance-seed/seedream-4.5", // Or bytedance-seed/seedream-4.5
         messages: [{
           role: "user",
           content: `Generate an image based on this exact prompt: "${prompt}". You must reply with ONLY the raw image URL starting with http. No formatting, no markdown.`
