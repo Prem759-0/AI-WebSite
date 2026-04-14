@@ -8,46 +8,60 @@
 }
 
 body {
-  background: #050508;
+  background: #030305;
   color: hsl(var(--foreground));
   overflow-x: hidden;
 }
 
-/* Elite Glass Effect */
+/* Premium Glass Effect with Inset Shadow */
 .glass-panel {
-  background: rgba(255, 255, 255, 0.01);
-  backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+  background: rgba(255, 255, 255, 0.02);
+  backdrop-filter: blur(24px) saturate(200%);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 
+    0 4px 30px rgba(0, 0, 0, 0.5),
+    inset 0 1px 1px rgba(255, 255, 255, 0.05);
 }
 
-.glass-card-hover {
-  transition: all 0.3s ease;
+.glass-dropdown {
+  background: rgba(15, 15, 20, 0.85);
+  backdrop-filter: blur(24px) saturate(200%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
 }
 
-.glass-card-hover:hover {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(59, 130, 246, 0.5);
-  transform: translateY(-2px);
-}
-
-/* Animated Background Glow */
-.bg-glow {
+/* Custom Animated Background */
+.bg-mesh {
   position: fixed;
-  width: 600px;
-  height: 600px;
-  background: radial-gradient(circle, rgba(37, 99, 235, 0.15) 0%, transparent 70%);
-  border-radius: 50%;
-  pointer-events: none;
+  inset: 0;
   z-index: -1;
-  filter: blur(80px);
+  background: 
+    radial-gradient(circle at 15% 50%, rgba(37, 99, 235, 0.08), transparent 50%),
+    radial-gradient(circle at 85% 30%, rgba(147, 51, 234, 0.08), transparent 50%);
+  filter: blur(60px);
+  pointer-events: none;
 }
 
+/* Smooth Scrollbars */
 ::-webkit-scrollbar {
-  width: 4px;
+  width: 6px;
 }
-
+::-webkit-scrollbar-track {
+  background: transparent;
+}
 ::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
+  border-radius: 20px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+  100% { transform: translateY(0px); }
+}
+.animate-float {
+  animation: float 6s ease-in-out infinite;
 }
