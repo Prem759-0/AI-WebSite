@@ -40,7 +40,7 @@ export const ChatBox = ({ chatId }: { chatId?: string }) => {
     setInput("");
     setIsLoading(true);
 
-    // Add a temporary empty assistant message
+    // Add a temporary empty assistant message to the screen
     setMessages(prev => [...prev, { role: "assistant", content: "" }]);
 
     try {
@@ -54,9 +54,11 @@ export const ChatBox = ({ chatId }: { chatId?: string }) => {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Image API failed");
         
+        // PROPER REACT STATE UPDATE (Creates a new object so React redraws)
         setMessages(prev => {
           const newMsgs = [...prev];
-          newMsgs[newMsgs.length - 1].content = `![Image](${data.url})`;
+          const lastIndex = newMsgs.length - 1;
+          newMsgs[lastIndex] = { ...newMsgs[lastIndex], content: `![Image](${data.url})` };
           return newMsgs;
         });
 
@@ -82,20 +84,28 @@ export const ChatBox = ({ chatId }: { chatId?: string }) => {
           const { done, value } = await reader.read();
           if (done) break;
           
-          fullContent += decoder.decode(value);
+          // Decode the stream chunk
+          fullContent += decoder.decode(value, { stream: true });
+          
+          // PROPER REACT STATE UPDATE for streaming
           setMessages(prev => {
-            const last = [...prev];
-            last[last.length - 1].content = fullContent;
-            return last;
+            const newMsgs = [...prev];
+            const lastIndex = newMsgs.length - 1;
+            newMsgs[lastIndex] = { ...newMsgs[lastIndex], content: fullContent };
+            return newMsgs;
           });
         }
       }
     } catch (e: any) {
       console.error("Chat Error:", e);
-      // FORCE the error to show up in the chat UI
+      // Show the exact error on the screen
       setMessages(prev => {
         const newMsgs = [...prev];
-        newMsgs[newMsgs.length - 1].content = `❌ Connection Error: ${e.message}. Please check your OpenRouter API Key and Credits.`;
+        const lastIndex = newMsgs.length - 1;
+        newMsgs[lastIndex] = { 
+          ...newMsgs[lastIndex], 
+          content: `❌ Error: ${e.message}. Check console or API keys.` 
+        };
         return newMsgs;
       });
     } finally {
