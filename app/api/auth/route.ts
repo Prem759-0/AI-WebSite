@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import connectToDatabase from "@/lib/mongodb";
+import connectToDatabase from "@/lib/db";
 import User from "@/models/User";
-import { signToken } from "@/lib/auth";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
 import { cookies } from "next/headers";
 
 export async function POST(req: Request) {
@@ -11,26 +12,20 @@ export async function POST(req: Request) {
 
     let user;
     if (action === "signup") {
-      user = await User.create({ email, password, name: name || "User" });
+      const hashedPassword = await bcrypt.hash(password, 10);
+      user = await User.create({ email, password: hashedPassword, name: name || "User" });
     } else {
       user = await User.findOne({ email });
-      if (!user || user.password !== password) {
+      if (!user || !(await bcrypt.compare(password, user.password))) {
         return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
       }
     }
 
-    const token = signToken({ userId: user._id });
-    
-    // Set the cookie for the middleware to see
-    cookies().set("auth-token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      maxAge: 60 * 60 * 24 * 7, // 1 week
-      path: "/",
-    });
+    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET!, { expiresIn: "7d" });
+    cookies().set("auth-token", token, { httpOnly: true, secure: true, path: "/" });
 
-    return NextResponse.json({ user: { email: user.email, name: user.name } });
-  } catch (error) {
-    return NextResponse.json({ error: "Auth failed" }, { status: 500 });
+    return NextResponse.json({ success: true, user: { name: user.name, email: user.email } });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
