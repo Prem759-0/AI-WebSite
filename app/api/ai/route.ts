@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-// Changed detectIntent back to detectType so it matches your saved file exactly!
-import { MODEL_MAP, detectType } from "@/lib/ai-router"; 
+// Matching the detectIntent export that you successfully saved in ai-router.ts
+import { MODEL_MAP, detectIntent } from "@/lib/ai-router"; 
 import connectToDatabase from "@/lib/mongodb";
 import Usage from "@/models/Usage";
 
@@ -11,8 +11,8 @@ export async function POST(req: Request) {
     const { messages } = await req.json();
     const lastMsg = messages[messages.length - 1].content;
     
-    // Using detectType here to fix the import error
-    const intent = detectType(lastMsg);
+    // Using detectIntent here
+    const intent = detectIntent(lastMsg);
     const model = MODEL_MAP[intent] || MODEL_MAP.text;
 
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
