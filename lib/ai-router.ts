@@ -9,12 +9,14 @@ export const MODEL_MAP: Record<string, string> = {
   seo: "openai/gpt-oss-120b:free"
 };
 
-export function detectType(message: string): string {
+export function detectIntent(message: string): string {
   const msg = message.toLowerCase();
+  
   if (msg.includes("code") || msg.includes("error") || msg.includes("bug")) return "code";
   if (msg.includes("translate") || msg.includes("meaning")) return "translate";
   if (msg.includes("story") || msg.includes("imagine") || msg.includes("roleplay")) return "roleplay";
   if (msg.includes("science") || msg.includes("how does") || msg.includes("explain deeply")) return "science";
   if (msg.includes("money") || msg.includes("seo") || msg.includes("business")) return "finance";
+  
   return "text";
 }
