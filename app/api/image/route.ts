@@ -5,9 +5,7 @@ export async function POST(req: Request) {
     const { prompt } = await req.json();
     const apiKey = process.env.OPENROUTER_API_KEY;
 
-    if (!apiKey) {
-      return NextResponse.json({ error: "API Key is missing" }, { status: 500 });
-    }
+    if (!apiKey) return NextResponse.json({ error: "API Key is missing" }, { status: 500 });
 
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
@@ -18,36 +16,35 @@ export async function POST(req: Request) {
         "X-Title": "AI Nexus"
       },
       body: JSON.stringify({
-        model: "bytedance-seed/seedream-4.5", // Or bytedance-seed/seedream-4.5
+        model: "sourceful/riverflow-v2-pro", 
         messages: [{
           role: "user",
-          content: `Generate an image based on this exact prompt: "${prompt}". You must reply with ONLY the raw image URL starting with http. No formatting, no markdown.`
+          content: `Generate an image based on this exact prompt: "${prompt}". You must reply with ONLY the direct image URL or Base64 data. No extra text.`
         }],
       }),
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      return NextResponse.json({ 
-        error: errorData.error?.message || `OpenRouter API Error: ${response.status}` 
-      }, { status: response.status });
+      const err = await response.json().catch(() => ({}));
+      return NextResponse.json({ error: err.error?.message || "API Error" }, { status: response.status });
     }
 
     const data = await response.json();
     const rawContent = data.choices?.[0]?.message?.content?.trim() || "";
 
-    // ULTRA-ROBUST URL EXTRACTOR: Finds the http link even if it's buried in text/markdown
+    // Check for standard HTTP URL
     const urlMatch = rawContent.match(/https?:\/\/[^\s)\]"]+/);
-    const extractedUrl = urlMatch ? urlMatch[0] : null;
+    // Check for Base64 Image data
+    const base64Match = rawContent.match(/data:image\/[a-zA-Z]*;base64,[^\s)\]"]+/);
 
-    if (!extractedUrl) {
-      console.error("Model did not return a URL. It returned:", rawContent);
-      return NextResponse.json({ 
-        error: "Model returned text instead of an image. Try a different prompt." 
-      }, { status: 500 });
+    const finalUrl = (urlMatch ? urlMatch[0] : null) || (base64Match ? base64Match[0] : null);
+
+    if (!finalUrl) {
+      console.log("Failed to find image in this text:", rawContent);
+      return NextResponse.json({ error: "Model returned text instead of an image." }, { status: 500 });
     }
 
-    return NextResponse.json({ url: extractedUrl });
+    return NextResponse.json({ url: finalUrl });
   } catch (error: any) {
     return NextResponse.json({ error: "Server failed: " + error.message }, { status: 500 });
   }
