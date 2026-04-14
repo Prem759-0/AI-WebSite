@@ -1,29 +1,31 @@
 import { NextResponse } from "next/server";
-import connectToDatabase from "@/lib/mongodb";
+import connectToDatabase from "@/lib/db";
 import Chat from "@/models/Chat";
+import jwt from "jsonwebtoken";
+import { cookies } from "next/headers";
 
-export async function POST(req: Request) {
+function getUserId() {
+  const token = cookies().get("auth-token")?.value;
+  if (!token) return null;
   try {
-    await connectToDatabase();
-    const { title, messages } = await req.json();
-
-    const newChat = await Chat.create({
-      title: title || "New Chat",
-      messages: messages || [],
-    });
-
-    return NextResponse.json(newChat, { status: 201 });
-  } catch (error) {
-    return NextResponse.json({ error: "Failed to create chat" }, { status: 500 });
-  }
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { userId: string };
+    return decoded.userId;
+  } catch { return null; }
 }
 
 export async function GET() {
-  try {
-    await connectToDatabase();
-    const chats = await Chat.find({}).sort({ updatedAt: -1 });
-    return NextResponse.json(chats);
-  } catch (error) {
-    return NextResponse.json({ error: "Failed to fetch chats" }, { status: 500 });
-  }
+  const userId = getUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  await connectToDatabase();
+  const chats = await Chat.find({ userId }).sort({ updatedAt: -1 }).select("-messages");
+  return NextResponse.json(chats);
+}
+
+export async function POST(req: Request) {
+  const userId = getUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  await connectToDatabase();
+  const { title } = await req.json();
+  const chat = await Chat.create({ userId, title: title || "New Chat", messages: [] });
+  return NextResponse.json(chat);
 }
