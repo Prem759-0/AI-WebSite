@@ -1,6 +1,7 @@
-export const MODEL_MAP: Record<string, string> = {
-  text: "google/gemma-4-26b-a4b-it:free",
-  code: "openai/gpt-oss-120b:free",
+
+  export const MODEL_MAP: Record<string, string> = {
+  text: "mistralai/mistral-7b-instruct:free", // Very stable free model
+  code: "mistralai/mistral-7b-instruct:free",
   roleplay: "z-ai/glm-4.5-air:free",
   tech: "nvidia/nemotron-3-super-120b-a12b:free",
   science: "nvidia/nemotron-3-super-120b-a12b:free",
