@@ -67,11 +67,14 @@ export default function ChatApp() {
     const txt = forcedInput || input;
     if (!txt.trim() || loading) return;
     
-    let cId = activeId;
-    if (!cId) {
+    let cId: string = activeId as string;
+    
+    if (!activeId) {
       const res = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${getToken()}` }, body: JSON.stringify({ title: txt.substring(0, 30) }) });
       const n = await res.json();
-      cId = n._id; setActiveId(cId); setChats([{ _id: cId, title: n.title, updatedAt: new Date().toISOString() }, ...chats]);
+      cId = n._id as string;
+      setActiveId(cId);
+      setChats([{ _id: cId, title: n.title, updatedAt: new Date().toISOString() }, ...chats]);
     }
 
     const cur = [...messages, { role: "user" as const, content: txt }];
