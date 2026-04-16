@@ -1,11 +1,11 @@
 export const MODEL_MAP: Record<string, string> = {
-  // Using highly stable Meta Llama 3.1 and Microsoft Phi-3 free models
-  text: "meta-llama/llama-3.1-8b-instruct:free",
-  code: "meta-llama/llama-3.1-8b-instruct:free",
-  roleplay: "microsoft/phi-3-mini-128k-instruct:free",
-  tech: "meta-llama/llama-3.1-8b-instruct:free",
-  science: "microsoft/phi-3-mini-128k-instruct:free",
-  translate: "meta-llama/llama-3.1-8b-instruct:free"
+  // Brand new, active 2026 OpenRouter Free Models
+  text: "meta-llama/llama-3.3-70b-instruct:free",
+  code: "openai/gpt-oss-120b:free",
+  roleplay: "google/gemma-3-27b-it:free",
+  tech: "nvidia/nemotron-3-super-120b-a12b:free",
+  science: "qwen/qwen3-coder:free",
+  translate: "minimax/minimax-m2.5:free"
 };
 
 export function detectIntent(message: string): string {
