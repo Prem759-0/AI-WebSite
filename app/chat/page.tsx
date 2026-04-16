@@ -108,6 +108,15 @@ export default function ChatApp() {
   const handleCopy = (text: string, i: number) => { navigator.clipboard.writeText(text); setCopied(i); setTimeout(() => setCopied(null), 2000); };
   const speak = (text: string) => { window.speechSynthesis.speak(new SpeechSynthesisUtterance(text.replace(/[*#]/g, ""))); };
 
+  // Restore the missing voice function
+  const handleVoice = () => {
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR) return alert("Voice not supported in this browser.");
+    const r = new SR();
+    r.onresult = (e: any) => setInput(e.results[0][0].transcript);
+    r.start();
+  };
+
   const stopGenerating = () => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
