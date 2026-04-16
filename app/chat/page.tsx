@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Search, Compass, Book, Folder, Clock, MoreHorizontal, Link, Download, Globe, Settings, Mic, Paperclip, Send, Loader2, Image as ImageIcon, Lightbulb, Sparkles, LogOut, PanelLeftClose, PanelLeft, Copy, Check, Volume2, SquareSquare } from "lucide-react";
+import { Plus, Search, Compass, Book, Folder, Clock, MoreHorizontal, Link, Download, Globe, Settings, Mic, Paperclip, Send, Loader2, Image as ImageIcon, Lightbulb, Sparkles, LogOut, PanelLeftClose, PanelLeft, Copy, Check, Volume2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
 type Message = { role: "user" | "assistant", content: string };
@@ -31,7 +31,7 @@ export default function ChatApp() {
     fetch("/api/chat", { headers: { Authorization: `Bearer ${t}` } })
       .then(r => r.json()).then(d => Array.isArray(d) && setChats(d));
     if (window.innerWidth < 768) setSidebarOpen(false);
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     if (activeId) fetch(`/api/chat/${activeId}`).then(r => r.json()).then(d => setMessages(d.messages || []));
