@@ -1,31 +1,22 @@
 import { NextResponse } from "next/server";
-import connectToDatabase from "@/lib/db";
-import Chat from "@/models/Chat";
+import connectToDatabase from "@/lib/mongodb";
+import { Chat } from "@/models/schema";
 import jwt from "jsonwebtoken";
-import { cookies } from "next/headers";
-
-function getUserId() {
-  const token = cookies().get("auth-token")?.value;
+function getUserId(req: Request) {
+  const token = req.headers.get("authorization")?.split(" ")[1];
   if (!token) return null;
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { userId: string };
-    return decoded.userId;
-  } catch { return null; }
+  try { return (jwt.verify(token, process.env.JWT_SECRET || "sec") as any).userId; } catch { return null; }
 }
-
-export async function GET() {
-  const userId = getUserId();
+export async function GET(req: Request) {
+  const userId = getUserId(req);
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   await connectToDatabase();
-  const chats = await Chat.find({ userId }).sort({ updatedAt: -1 }).select("-messages");
-  return NextResponse.json(chats);
+  return NextResponse.json(await Chat.find({ userId }).sort({ updatedAt: -1 }).select("-messages"));
 }
-
 export async function POST(req: Request) {
-  const userId = getUserId();
+  const userId = getUserId(req);
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   await connectToDatabase();
   const { title } = await req.json();
-  const chat = await Chat.create({ userId, title: title || "New Chat", messages: [] });
-  return NextResponse.json(chat);
+  return NextResponse.json(await Chat.create({ userId, title: title || "New chat", messages: [] }));
 }
