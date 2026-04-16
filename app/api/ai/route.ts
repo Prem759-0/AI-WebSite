@@ -8,12 +8,12 @@ export async function POST(req: Request) {
 
     const { messages } = await req.json();
     
-    // Detect what the user is asking and pick the best model dynamically
+    // Detect intent and grab the new active model
     const lastMsg = messages[messages.length - 1]?.content || "";
     const intent = detectIntent(lastMsg);
     
-    // Grab the correct model, or fallback to Llama 3.1 if something goes wrong
-    const activeModel = MODEL_MAP[intent] || "meta-llama/llama-3.1-8b-instruct:free";
+    // Fallback to Llama 3.3 if something goes wrong
+    const activeModel = MODEL_MAP[intent] || "meta-llama/llama-3.3-70b-instruct:free";
 
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
@@ -35,7 +35,6 @@ export async function POST(req: Request) {
       return new Response(`OpenRouter Error: ${err}`, { status: response.status });
     }
 
-    // Process the Real-Time Stream
     const stream = new ReadableStream({
       async start(controller) {
         const reader = response.body?.getReader();
@@ -57,9 +56,7 @@ export async function POST(req: Request) {
               const data = JSON.parse(line.slice(6));
               const text = data.choices[0]?.delta?.content || "";
               controller.enqueue(new TextEncoder().encode(text));
-            } catch (e) {
-              // Ignore incomplete JSON chunks during streaming
-            }
+            } catch (e) {}
           }
         }
         controller.close();
