@@ -1,45 +1,33 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
-import { Sparkles, Loader2 } from "lucide-react";
-
+import { Sparkles } from "lucide-react";
 export default function Login() {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [name, setName] = useState("");
   const router = useRouter();
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    const res = await fetch("/api/auth", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: isLogin ? "login" : "signup", email, password }),
-    });
-    if (res.ok) router.push("/");
-    else alert("Authentication failed");
-    setLoading(false);
+    const res = await fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: isLogin ? "login" : "signup", email, password, name }) });
+    const data = await res.json();
+    if (res.ok) { localStorage.setItem("token", data.token); localStorage.setItem("user", JSON.stringify(data.user)); router.push("/chat"); }
+    else alert(data.error);
   };
-
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#0b0c10]">
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass-panel p-8 rounded-3xl w-full max-w-md">
-        <Sparkles className="w-12 h-12 text-blue-500 mx-auto mb-6" />
-        <h2 className="text-2xl font-bold text-center mb-6">{isLogin ? "Welcome Back" : "Create Account"}</h2>
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <input type="email" placeholder="Email" required value={email} onChange={(e) => setEmail(e.target.value)} className="bg-black/20 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-blue-500" />
-          <input type="password" placeholder="Password" required value={password} onChange={(e) => setPassword(e.target.value)} className="bg-black/20 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-blue-500" />
-          <button type="submit" disabled={loading} className="bg-blue-600 hover:bg-blue-500 text-white rounded-xl py-3 font-semibold transition flex justify-center mt-2">
-            {loading ? <Loader2 className="animate-spin" /> : (isLogin ? "Sign In" : "Sign Up")}
-          </button>
+    <div className="h-screen w-full flex items-center justify-center p-4">
+      <div className="w-full max-w-md bg-white rounded-3xl shadow-xl border border-gray-100 p-8">
+        <div className="w-12 h-12 bg-cortex-purple/10 text-cortex-purple rounded-xl flex items-center justify-center mb-6"><Sparkles size={24} /></div>
+        <h2 className="text-2xl font-bold mb-6">{isLogin ? "Sign in to Cortex" : "Create Account"}</h2>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {!isLogin && <input required type="text" placeholder="Name" value={name} onChange={e => setName(e.target.value)} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-cortex-purple" />}
+          <input required type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-cortex-purple" />
+          <input required type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-cortex-purple" />
+          <button type="submit" className="w-full bg-black text-white rounded-xl py-3 font-medium hover:bg-gray-800 transition">{isLogin ? "Continue" : "Sign Up"}</button>
         </form>
-        <p className="text-center text-sm text-white/40 mt-6 cursor-pointer hover:text-white" onClick={() => setIsLogin(!isLogin)}>
-          {isLogin ? "Need an account? Sign up" : "Already have an account? Sign in"}
-        </p>
-      </motion.div>
+        <p className="text-sm text-gray-500 mt-6 text-center cursor-pointer" onClick={() => setIsLogin(!isLogin)}>{isLogin ? "Need an account? Sign up" : "Have an account? Sign in"}</p>
+      </div>
     </div>
   );
 }
