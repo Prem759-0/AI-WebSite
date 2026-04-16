@@ -1,11 +1,21 @@
-import "./globals.css";
+import "./globals.css"; // THIS LINE MUST BE AT THE TOP
+import { Inter } from "next/font/google";
 
-export const metadata = { title: "Cortex AI", description: "AI Assistant" };
+const inter = Inter({ subsets: ["latin"] });
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export const metadata = {
+  title: "Cortex AI",
+  description: "Premium AI Assistant",
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body className={inter.className}>{children}</body>
     </html>
   );
 }
