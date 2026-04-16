@@ -1,10 +1,11 @@
 export const MODEL_MAP: Record<string, string> = {
-  // Brand new, active 2026 OpenRouter Free Models
-  text: "meta-llama/llama-3.3-70b-instruct:free",
+  // The ultimate fail-safe: automatically picks an available free model
+  text: "openrouter/free",
+  // Highly stable, specialized free models for specific tasks
   code: "openai/gpt-oss-120b:free",
-  roleplay: "google/gemma-3-27b-it:free",
+  roleplay: "z-ai/glm-4.5-air:free",
   tech: "nvidia/nemotron-3-super-120b-a12b:free",
-  science: "qwen/qwen3-coder:free",
+  science: "google/gemma-4-26b-a4b-it:free",
   translate: "minimax/minimax-m2.5:free"
 };
 
