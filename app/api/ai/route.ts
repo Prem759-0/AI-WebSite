@@ -8,12 +8,12 @@ export async function POST(req: Request) {
 
     const { messages } = await req.json();
     
-    // Detect intent and grab the new active model
+    // Detect intent and grab the best model
     const lastMsg = messages[messages.length - 1]?.content || "";
     const intent = detectIntent(lastMsg);
     
-    // Fallback to Llama 3.3 if something goes wrong
-    const activeModel = MODEL_MAP[intent] || "meta-llama/llama-3.3-70b-instruct:free";
+    // Fallback to the auto-router if something goes wrong
+    const activeModel = MODEL_MAP[intent] || "openrouter/free";
 
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
