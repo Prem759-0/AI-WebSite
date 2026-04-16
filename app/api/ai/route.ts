@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { MODEL_MAP } from "@/lib/ai-router";
+import { MODEL_MAP, detectIntent } from "@/lib/ai-router";
 
 export async function POST(req: Request) {
   try {
@@ -8,20 +8,24 @@ export async function POST(req: Request) {
 
     const { messages } = await req.json();
     
-    // We hardcode a known working FREE model to test connection
-    const model = "google/gemma-2-9b-it:free"; 
+    // Detect what the user is asking and pick the best model dynamically
+    const lastMsg = messages[messages.length - 1]?.content || "";
+    const intent = detectIntent(lastMsg);
+    
+    // Grab the correct model, or fallback to Llama 3.1 if something goes wrong
+    const activeModel = MODEL_MAP[intent] || "meta-llama/llama-3.1-8b-instruct:free";
 
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${apiKey}`,
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://ai-web-site-sigma.vercel.app", // Matches your URL
+        "HTTP-Referer": "https://ai-web-site-sigma.vercel.app", 
         "X-Title": "Cortex AI"
       },
       body: JSON.stringify({ 
-        model, 
-        messages, 
+        model: activeModel, 
+        messages: messages, 
         stream: true 
       }),
     });
@@ -31,7 +35,7 @@ export async function POST(req: Request) {
       return new Response(`OpenRouter Error: ${err}`, { status: response.status });
     }
 
-    // Streaming Logic
+    // Process the Real-Time Stream
     const stream = new ReadableStream({
       async start(controller) {
         const reader = response.body?.getReader();
@@ -43,12 +47,19 @@ export async function POST(req: Request) {
           if (done) break;
           const chunk = decoder.decode(value);
           const lines = chunk.split("\n").filter(l => l.startsWith("data: "));
+          
           for (const line of lines) {
-            if (line.includes("[DONE]")) { controller.close(); return; }
+            if (line.includes("[DONE]")) { 
+              controller.close(); 
+              return; 
+            }
             try {
               const data = JSON.parse(line.slice(6));
-              controller.enqueue(new TextEncoder().encode(data.choices[0]?.delta?.content || ""));
-            } catch (e) {}
+              const text = data.choices[0]?.delta?.content || "";
+              controller.enqueue(new TextEncoder().encode(text));
+            } catch (e) {
+              // Ignore incomplete JSON chunks during streaming
+            }
           }
         }
         controller.close();
