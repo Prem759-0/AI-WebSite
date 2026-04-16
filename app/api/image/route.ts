@@ -14,8 +14,11 @@ export async function POST(req: Request) {
       headers: {
         "Authorization": `Bearer ${apiKey}`,
         "Content-Type": "application/json",
+        "HTTP-Referer": "https://ai-web-site-sigma.vercel.app",
+        "X-Title": "Cortex AI"
       },
       body: JSON.stringify({
+        // Note: OpenRouter image models usually require paid credits.
         model: "sourceful/riverflow-v2-pro", 
         messages: [{
           role: "user",
@@ -24,12 +27,18 @@ export async function POST(req: Request) {
       }),
     });
 
+    if (!response.ok) {
+      const errText = await response.text();
+      // This will now send the EXACT OpenRouter error back to your frontend
+      return NextResponse.json({ error: `OpenRouter Image Error: ${errText}` }, { status: response.status });
+    }
+
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content || "";
     const urlMatch = content.match(/https?:\/\/[^\s)\]"]+/);
 
     if (!urlMatch) {
-      return NextResponse.json({ error: "AI didn't return a link" }, { status: 500 });
+      return NextResponse.json({ error: `AI didn't return a valid image link. It returned: ${content}` }, { status: 500 });
     }
 
     return NextResponse.json({ url: urlMatch[0] });
