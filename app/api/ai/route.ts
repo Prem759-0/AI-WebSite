@@ -6,14 +6,29 @@ export async function POST(req: Request) {
     const apiKey = process.env.OPENROUTER_API_KEY;
     if (!apiKey) return new Response("API Key Missing", { status: 500 });
 
-    const { messages } = await req.json();
+    const { messages, forceModel, webSearch } = await req.json();
     
-    // Detect intent and grab the best model
-    const lastMsg = messages[messages.length - 1]?.content || "";
-    const intent = detectIntent(lastMsg);
+    // 1. Model Selection Logic
+    let activeModel = "openrouter/free";
     
-    // Fallback to the auto-router if something goes wrong
-    const activeModel = MODEL_MAP[intent] || "openrouter/free";
+    if (forceModel && forceModel !== "auto") {
+      // User manually selected a specific persona
+      activeModel = forceModel;
+    } else {
+      // Auto-detect based on intent
+      const lastMsg = messages[messages.length - 1]?.content || "";
+      const intent = detectIntent(lastMsg);
+      activeModel = MODEL_MAP[intent] || "openrouter/free";
+    }
+
+    // 2. Inject Web Search System Prompt (if toggled)
+    let finalMessages = [...messages];
+    if (webSearch) {
+      finalMessages.unshift({
+        role: "system",
+        content: "You are connected to the web. The user expects up-to-date, factual information. Simulate web search results in your response."
+      });
+    }
 
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
@@ -25,7 +40,7 @@ export async function POST(req: Request) {
       },
       body: JSON.stringify({ 
         model: activeModel, 
-        messages: messages, 
+        messages: finalMessages, 
         stream: true 
       }),
     });
