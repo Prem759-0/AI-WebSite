@@ -91,6 +91,10 @@ export default function ChatApp() {
       } else {
         const res = await fetch("/api/ai", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages: cur }) });
         const reader = res.body?.getReader();
+        
+        // FIX: Explicitly check if reader exists to satisfy TypeScript strict null checks
+        if (!reader) throw new Error("Failed to read response stream.");
+        
         const decoder = new TextDecoder();
         setMessages([...cur, { role: "assistant", content: "" }]);
         let full = "";
