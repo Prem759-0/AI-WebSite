@@ -2,7 +2,11 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Search, Compass, Book, Folder, Clock, MoreHorizontal, Link, Download, Globe, Settings, Mic, Paperclip, Send, Loader2, Image as ImageIcon, Lightbulb, Sparkles, LogOut, PanelLeftClose, PanelLeft, Copy, Check, Volume2 } from "lucide-react";
+import { 
+  Plus, Search, Compass, Book, Folder, Clock, MoreHorizontal, Link, Download, 
+  Globe, Settings, Mic, Paperclip, Send, Loader2, Image as ImageIcon, 
+  Lightbulb, Sparkles, LogOut, PanelLeftClose, PanelLeft, Copy, Check, Volume2 
+} from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
 type Message = { role: "user" | "assistant", content: string };
@@ -22,31 +26,57 @@ export default function ChatApp() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
-  const getToken = () => localStorage.getItem("token");
+  const getToken = () => typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
   useEffect(() => {
     const t = getToken();
-    if (!t) return router.push("/login");
-    setUser(JSON.parse(localStorage.getItem("user") || "{}"));
-    fetch("/api/chat", { headers: { Authorization: `Bearer ${t}` } })
-      .then(r => r.json()).then(d => Array.isArray(d) && setChats(d));
+    if (!t) {
+      router.push("/login");
+      return;
+    }
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) setUser(JSON.parse(storedUser));
+
+    fetch("/api/chat", { 
+      headers: { Authorization: `Bearer ${t}` } 
+    })
+    .then(r => r.json())
+    .then(d => {
+      if (Array.isArray(d)) setChats(d);
+    })
+    .catch(err => console.error("History Load Error:", err));
+
     if (window.innerWidth < 768) setSidebarOpen(false);
   }, [router]);
 
   useEffect(() => {
-    if (activeId) fetch(`/api/chat/${activeId}`).then(r => r.json()).then(d => setMessages(d.messages || []));
-    else setMessages([]);
+    if (activeId) {
+      fetch(`/api/chat/${activeId}`)
+        .then(r => r.json())
+        .then(d => setMessages(d.messages || []));
+    } else {
+      setMessages([]);
+    }
   }, [activeId]);
 
   useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+    if (scrollRef.current) {
+      scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+    }
   }, [messages, loading]);
 
   const newChat = () => { setActiveId(null); setMessages([]); setView("chat"); if (window.innerWidth < 768) setSidebarOpen(false); };
 
-  const handleCopy = (text: string, i: number) => { navigator.clipboard.writeText(text); setCopied(i); setTimeout(() => setCopied(null), 2000); };
+  const handleCopy = (text: string, i: number) => { 
+    navigator.clipboard.writeText(text); 
+    setCopied(i); 
+    setTimeout(() => setCopied(null), 2000); 
+  };
   
-  const speak = (text: string) => { const u = new SpeechSynthesisUtterance(text.replace(/[*#]/g, "")); window.speechSynthesis.speak(u); };
+  const speak = (text: string) => { 
+    const u = new SpeechSynthesisUtterance(text.replace(/[*#]/g, "")); 
+    window.speechSynthesis.speak(u); 
+  };
 
   const handleVoice = () => {
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -67,86 +97,135 @@ export default function ChatApp() {
     const txt = forcedInput || input;
     if (!txt.trim() || loading) return;
     
-    let cId: string = activeId as string;
+    const token = getToken();
+    let cId: string | null = activeId;
     
-    if (!activeId) {
-      const res = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${getToken()}` }, body: JSON.stringify({ title: txt.substring(0, 30) }) });
+    if (!cId) {
+      const res = await fetch("/api/chat", { 
+        method: "POST", 
+        headers: { 
+          "Content-Type": "application/json", 
+          Authorization: `Bearer ${token}` 
+        }, 
+        body: JSON.stringify({ title: txt.substring(0, 30) }) 
+      });
       const n = await res.json();
-      cId = n._id as string;
+      cId = n._id;
       setActiveId(cId);
-      setChats([{ _id: cId, title: n.title, updatedAt: new Date().toISOString() }, ...chats]);
+      setChats(prev => [{ _id: n._id, title: n.title, updatedAt: new Date().toISOString() }, ...prev]);
     }
 
-    const cur = [...messages, { role: "user" as const, content: txt }];
-    setMessages(cur); setInput(""); setLoading(true);
+    const currentMessages = [...messages, { role: "user" as const, content: txt }];
+    setMessages(currentMessages); 
+    setInput(""); 
+    setLoading(true);
 
     try {
       if (mode === "image") {
-        setMessages([...cur, { role: "assistant", content: "" }]);
-        const res = await fetch("/api/image", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt: txt }) });
+        setMessages(prev => [...prev, { role: "assistant", content: "" }]);
+        const res = await fetch("/api/image", { 
+          method: "POST", 
+          headers: { "Content-Type": "application/json" }, 
+          body: JSON.stringify({ prompt: txt }) 
+        });
         const d = await res.json();
         const aiMsg = { role: "assistant" as const, content: `![Gen](${d.url})` };
-        setMessages([...cur, aiMsg]);
-        await fetch(`/api/chat/${cId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages: [...cur, aiMsg] }) });
+        setMessages([...currentMessages, aiMsg]);
+        if (cId) {
+          await fetch(`/api/chat/${cId}`, { 
+            method: "PATCH", 
+            headers: { "Content-Type": "application/json" }, 
+            body: JSON.stringify({ messages: [...currentMessages, aiMsg] }) 
+          });
+        }
       } else {
-        const res = await fetch("/api/ai", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages: cur }) });
-        const reader = res.body?.getReader();
+        const res = await fetch("/api/ai", { 
+          method: "POST", 
+          headers: { "Content-Type": "application/json" }, 
+          body: JSON.stringify({ messages: currentMessages }) 
+        });
         
-        // FIX: Explicitly check if reader exists to satisfy TypeScript strict null checks
-        if (!reader) throw new Error("Failed to read response stream.");
+        const reader = res.body?.getReader();
+        if (!reader) throw new Error("Failed to read stream");
         
         const decoder = new TextDecoder();
-        setMessages([...cur, { role: "assistant", content: "" }]);
+        setMessages([...currentMessages, { role: "assistant", content: "" }]);
         let full = "";
+        
         while (true) {
-          const { done, value } = await reader.read(); if (done) break;
+          const { done, value } = await reader.read();
+          if (done) break;
           full += decoder.decode(value, { stream: true });
-          setMessages([...cur, { role: "assistant", content: full }]);
+          setMessages([...currentMessages, { role: "assistant", content: full }]);
         }
-        await fetch(`/api/chat/${cId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages: [...cur, { role: "assistant", content: full }] }) });
+        
+        if (cId) {
+          await fetch(`/api/chat/${cId}`, { 
+            method: "PATCH", 
+            headers: { "Content-Type": "application/json" }, 
+            body: JSON.stringify({ messages: [...currentMessages, { role: "assistant", content: full }] }) 
+          });
+        }
       }
-    } catch (e: any) { setMessages([...cur, { role: "assistant", content: `❌ Error: ${e.message}` }]); } 
-    finally { setLoading(false); }
+    } catch (e: any) { 
+      setMessages(prev => [...prev.slice(0, -1), { role: "assistant", content: `❌ Error: ${e.message}` }]); 
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   const filteredChats = chats.filter(c => c.title.toLowerCase().includes(search.toLowerCase()));
 
   return (
-    <div className="h-screen w-full bg-cortex-border p-2 md:p-4 flex gap-4 overflow-hidden">
+    <div className="h-screen w-full bg-cortex-border p-2 md:p-4 flex gap-4 overflow-hidden font-sans">
       
       {/* Sidebar Overlay Mobile */}
       {sidebarOpen && <div className="fixed inset-0 bg-black/20 z-40 md:hidden" onClick={() => setSidebarOpen(false)} />}
 
       {/* Sidebar */}
       <AnimatePresence>
-        {(sidebarOpen || window.innerWidth >= 768) && (
-          <motion.aside initial={{ x: -300 }} animate={{ x: 0 }} exit={{ x: -300 }} transition={{ type: "spring", bounce: 0, duration: 0.3 }} 
-            className={`w-[260px] bg-cortex-light rounded-2xl flex flex-col shrink-0 z-50 fixed md:relative h-[calc(100vh-1rem)] md:h-full border border-gray-200 shadow-xl md:shadow-none`}>
+        {(sidebarOpen) && (
+          <motion.aside 
+            initial={{ x: -300 }} animate={{ x: 0 }} exit={{ x: -300 }} transition={{ type: "spring", bounce: 0, duration: 0.3 }} 
+            className={`w-[260px] bg-cortex-light rounded-2xl flex flex-col shrink-0 z-50 fixed md:relative h-[calc(100vh-1rem)] md:h-full border border-gray-200 shadow-xl md:shadow-none`}
+          >
             <div className="p-4 flex items-center justify-between">
-              <div className="flex items-center gap-2 text-cortex-purple font-semibold text-lg"><div className="bg-cortex-purple/10 p-1.5 rounded-lg"><Sparkles size={18}/></div> Cortex</div>
+              <div className="flex items-center gap-2 text-cortex-purple font-semibold text-lg">
+                <div className="bg-cortex-purple/10 p-1.5 rounded-lg"><Sparkles size={18}/></div> Cortex
+              </div>
               <button onClick={() => setSidebarOpen(false)} className="md:hidden text-gray-500"><PanelLeftClose size={20}/></button>
             </div>
             
             <div className="px-4 mb-4">
-              <button onClick={newChat} className="w-full bg-[#1a1a1a] text-white py-2.5 rounded-xl flex items-center justify-center gap-2 font-medium hover:bg-black transition"><Plus size={16}/> New chat</button>
+              <button onClick={newChat} className="w-full bg-[#1a1a1a] text-white py-2.5 rounded-xl flex items-center justify-center gap-2 font-medium hover:bg-black transition">
+                <Plus size={16}/> New chat
+              </button>
             </div>
 
             <div className="px-4 mb-4 relative">
               <Search size={14} className="absolute left-7 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input type="text" placeholder="Search" value={search} onChange={e=>setSearch(e.target.value)} className="w-full bg-white border border-gray-200 rounded-lg pl-8 pr-3 py-1.5 text-sm outline-none focus:border-cortex-purple" />
+              <input 
+                type="text" placeholder="Search history..." value={search} onChange={e=>setSearch(e.target.value)} 
+                className="w-full bg-white border border-gray-200 rounded-lg pl-8 pr-3 py-1.5 text-sm outline-none focus:border-cortex-purple" 
+              />
             </div>
 
             <nav className="px-3 space-y-0.5 mb-4">
               {[{i:<Compass size={16}/>,l:"Explore",v:"explore"}, {i:<Book size={16}/>,l:"Library",v:"chat"}, {i:<Folder size={16}/>,l:"Files",v:"chat"}].map(n => (
-                <button key={n.l} onClick={()=>setView(n.v as any)} className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg font-medium transition ${view===n.v ? "bg-gray-200 text-black" : "text-gray-600 hover:bg-gray-100"}`}>{n.i} {n.l}</button>
+                <button key={n.l} onClick={()=>setView(n.v as any)} className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg font-medium transition ${view===n.v ? "bg-gray-200 text-black" : "text-gray-600 hover:bg-gray-100"}`}>
+                  {n.i} {n.l}
+                </button>
               ))}
             </nav>
 
             <div className="flex-1 overflow-y-auto px-4 custom-scrollbar">
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">History</p>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Recent Chats</p>
               {filteredChats.map(c => (
-                <div key={c._id} onClick={() => {setActiveId(c._id); setView("chat"); if(window.innerWidth<768) setSidebarOpen(false);}} 
-                  className={`truncate text-[13px] py-2 px-2.5 rounded-lg cursor-pointer transition mb-0.5 ${activeId === c._id && view==="chat" ? "bg-cortex-purple/10 text-cortex-purple font-medium" : "text-gray-600 hover:bg-gray-100"}`}>
+                <div 
+                  key={c._id} 
+                  onClick={() => {setActiveId(c._id); setView("chat"); if(window.innerWidth<768) setSidebarOpen(false);}} 
+                  className={`truncate text-[13px] py-2 px-2.5 rounded-lg cursor-pointer transition mb-0.5 ${activeId === c._id && view==="chat" ? "bg-cortex-purple/10 text-cortex-purple font-medium" : "text-gray-600 hover:bg-gray-100"}`}
+                >
                   {c.title}
                 </div>
               ))}
@@ -155,10 +234,17 @@ export default function ChatApp() {
             <div className="p-4 border-t border-gray-200 mt-auto">
               <div onClick={()=>setView("profile")} className="flex items-center justify-between cursor-pointer group p-2 hover:bg-gray-100 rounded-xl transition">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-gray-300 to-gray-400 flex items-center justify-center text-white font-bold text-sm">{user.name[0]}</div>
-                  <div className="flex flex-col"><span className="text-sm font-semibold text-gray-800">{user.name}</span><span className="text-[10px] text-gray-500 truncate w-24">{user.email}</span></div>
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-gray-300 to-gray-400 flex items-center justify-center text-white font-bold text-sm">
+                    {user.name ? user.name[0] : "U"}
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-semibold text-gray-800">{user.name}</span>
+                    <span className="text-[10px] text-gray-500 truncate w-24">{user.email}</span>
+                  </div>
                 </div>
-                <button onClick={(e)=>{e.stopPropagation(); localStorage.clear(); router.push("/login");}} className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition"><LogOut size={16}/></button>
+                <button onClick={(e)=>{e.stopPropagation(); localStorage.clear(); router.push("/login");}} className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition">
+                  <LogOut size={16}/>
+                </button>
               </div>
             </div>
           </motion.aside>
@@ -171,21 +257,53 @@ export default function ChatApp() {
         <header className="h-14 flex items-center justify-between px-4 border-b border-gray-100 bg-white/80 backdrop-blur-md z-10 shrink-0">
           <div className="flex items-center gap-3">
             {!sidebarOpen && <button onClick={() => setSidebarOpen(true)} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-600"><PanelLeft size={20}/></button>}
-            <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-200 text-sm font-medium hover:bg-gray-50 bg-white"><div className="w-4 h-4 bg-cortex-purple/20 text-cortex-purple rounded flex items-center justify-center"><Plus size={10}/></div> {view === "chat" ? "Cortex" : view}</button>
+            <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-200 text-sm font-medium hover:bg-gray-50 bg-white">
+              <div className="w-4 h-4 bg-cortex-purple/20 text-cortex-purple rounded flex items-center justify-center"><Plus size={10}/></div> 
+              {view === "chat" ? "Cortex AI" : view.charAt(0).toUpperCase() + view.slice(1)}
+            </button>
           </div>
           <div className="flex items-center gap-2">
             <button onClick={()=>setView("settings")} className="p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-50 rounded-lg hidden sm:block"><Settings size={18}/></button>
             <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-200 text-sm font-medium hover:bg-gray-50 hidden sm:flex"><Download size={14}/> Export</button>
-            <button className="bg-black text-white px-4 py-1.5 rounded-lg text-sm font-medium">Upgrade</button>
+            <button className="bg-black text-white px-4 py-1.5 rounded-lg text-sm font-medium hover:bg-gray-800 transition shadow-sm">Upgrade</button>
           </div>
         </header>
 
         {view !== "chat" ? (
           <div className="flex-1 p-8 overflow-y-auto">
             <h2 className="text-2xl font-bold mb-6 capitalize">{view}</h2>
-            {view === "settings" && <div className="max-w-md space-y-4"><div className="p-4 border rounded-xl flex justify-between items-center"><span className="font-medium">Dark Mode</span><input type="checkbox" className="toggle"/></div><div className="p-4 border rounded-xl flex justify-between items-center"><span className="font-medium">Auto-save chats</span><input type="checkbox" defaultChecked className="toggle"/></div></div>}
-            {view === "profile" && <div className="max-w-md p-6 border rounded-2xl text-center"><div className="w-20 h-20 bg-gray-200 rounded-full mx-auto mb-4 flex items-center justify-center text-2xl font-bold">{user.name[0]}</div><h3 className="font-bold text-xl">{user.name}</h3><p className="text-gray-500">{user.email}</p><button className="mt-4 w-full py-2 bg-gray-100 rounded-lg hover:bg-gray-200 font-medium">Edit Profile</button></div>}
-            {view === "explore" && <div className="grid grid-cols-1 md:grid-cols-2 gap-4"><div className="p-6 border rounded-2xl hover:border-cortex-purple cursor-pointer"><Lightbulb className="mb-3 text-yellow-500"/><h3 className="font-bold">Write Code</h3><p className="text-sm text-gray-500 mt-1">Generate functional React components instantly.</p></div><div className="p-6 border rounded-2xl hover:border-cortex-purple cursor-pointer"><ImageIcon className="mb-3 text-cortex-purple"/><h3 className="font-bold">Image Gen</h3><p className="text-sm text-gray-500 mt-1">Create stunning visuals from text.</p></div></div>}
+            {view === "settings" && (
+              <div className="max-w-md space-y-4">
+                <div className="p-4 border rounded-xl flex justify-between items-center bg-gray-50">
+                  <span className="font-medium">Dark Mode</span>
+                  <div className="w-10 h-5 bg-gray-300 rounded-full relative"><div className="w-4 h-4 bg-white rounded-full absolute left-0.5 top-0.5" /></div>
+                </div>
+                <div className="p-4 border rounded-xl flex justify-between items-center bg-gray-50">
+                  <span className="font-medium">Auto-save chats</span>
+                  <div className="w-10 h-5 bg-green-500 rounded-full relative"><div className="w-4 h-4 bg-white rounded-full absolute right-0.5 top-0.5" /></div>
+                </div>
+              </div>
+            )}
+            {view === "profile" && (
+              <div className="max-w-md p-6 border rounded-2xl text-center shadow-sm">
+                <div className="w-20 h-20 bg-gray-200 rounded-full mx-auto mb-4 flex items-center justify-center text-2xl font-bold">{user.name[0]}</div>
+                <h3 className="font-bold text-xl">{user.name}</h3>
+                <p className="text-gray-500">{user.email}</p>
+                <button className="mt-6 w-full py-2.5 bg-gray-900 text-white rounded-lg hover:bg-black font-medium transition">Edit Profile</button>
+              </div>
+            )}
+            {view === "explore" && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div onClick={() => {setView("chat"); send("text", "Write a React component for a clean login page.");}} className="p-6 border rounded-2xl hover:border-cortex-purple cursor-pointer transition hover:bg-cortex-purple/5">
+                  <Lightbulb className="mb-3 text-yellow-500"/><h3 className="font-bold">Write Code</h3>
+                  <p className="text-sm text-gray-500 mt-1">Generate functional React components instantly.</p>
+                </div>
+                <div onClick={() => {setView("chat"); send("image", "A futuristic cyberpunk city at night with purple neon lights.");}} className="p-6 border rounded-2xl hover:border-cortex-purple cursor-pointer transition hover:bg-cortex-purple/5">
+                  <ImageIcon className="mb-3 text-cortex-purple"/><h3 className="font-bold">Image Gen</h3>
+                  <p className="text-sm text-gray-500 mt-1">Create stunning visuals from text.</p>
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <div className="flex-1 flex flex-col relative h-[calc(100%-3.5rem)]">
@@ -197,11 +315,16 @@ export default function ChatApp() {
                   <h2 className="text-3xl md:text-4xl font-semibold text-gray-900 tracking-tight mb-10">How can I assist you today?</h2>
 
                   <div className="w-full bg-white border border-gray-200 shadow-xl shadow-gray-200/50 rounded-[1.5rem] p-4 text-left">
-                    <textarea value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}}} placeholder="Ask me anything..." className="w-full resize-none outline-none text-[15px] bg-transparent min-h-[60px] placeholder:text-gray-400" />
+                    <textarea 
+                      value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}}} 
+                      placeholder="Ask me anything..." className="w-full resize-none outline-none text-[15px] bg-transparent min-h-[60px] placeholder:text-gray-400" 
+                    />
                     
                     <div className="flex items-center justify-between pb-3 border-b border-gray-100 mb-3">
                       <div className="flex gap-1.5 items-center">
-                        <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-cortex-purple/20 bg-cortex-purple/5 text-cortex-purple text-xs font-semibold hover:bg-cortex-purple/10"><Compass size={14}/> Deeper Research</button>
+                        <button onClick={() => send("text", "Deeper research on AI trends.")} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-cortex-purple/20 bg-cortex-purple/5 text-cortex-purple text-xs font-semibold hover:bg-cortex-purple/10">
+                          <Compass size={14}/> Deeper Research
+                        </button>
                         <button onClick={()=>send("image")} className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg"><ImageIcon size={16}/></button>
                       </div>
                       <div className="flex gap-1.5 items-center">
@@ -209,19 +332,21 @@ export default function ChatApp() {
                       </div>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-1.5 text-xs text-gray-500 font-medium"><Sparkles size={14} className="text-cortex-purple"/> Saved prompts</span>
+                      <span className="flex items-center gap-1.5 text-xs text-gray-500 font-medium"><Sparkles size={14} className="text-cortex-purple"/> AI-Powered Insights</span>
                       <div className="flex gap-2 items-center">
                         <input type="file" id="fileup" className="hidden" accept=".txt,.md" onChange={handleFile} />
-                        <label htmlFor="fileup" className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-gray-200 text-xs font-semibold hover:bg-gray-50 cursor-pointer"><Paperclip size={14}/> Attach file</label>
-                        <button onClick={()=>send()} disabled={loading||!input.trim()} className="bg-black disabled:bg-gray-300 text-white px-4 py-1.5 rounded-full text-xs font-medium flex items-center gap-1.5 hover:bg-gray-800">{loading?<Loader2 size={14} className="animate-spin"/>:<Send size={14}/>} Send</button>
+                        <label htmlFor="fileup" className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-gray-200 text-xs font-semibold hover:bg-gray-50 cursor-pointer"><Paperclip size={14}/> Attach</label>
+                        <button onClick={()=>send()} disabled={loading||!input.trim()} className="bg-black disabled:bg-gray-300 text-white px-4 py-1.5 rounded-full text-xs font-medium flex items-center gap-1.5 hover:bg-gray-800 transition">
+                          {loading?<Loader2 size={14} className="animate-spin"/>:<Send size={14}/>} Send
+                        </button>
                       </div>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full mt-6">
-                    {[{i:<Clock size={16}/>,t:"Synthesize Data",d:"Turn notes into 5 bullets."},{i:<Lightbulb size={16}/>,t:"Brainstorm",d:"3 taglines for fashion brand."},{i:<Compass size={16}/>,t:"Check Facts",d:"GDPR vs CCPA differences."}].map((c,i)=>(
-                      <div key={i} onClick={()=>send("text",c.d)} className="bg-white border border-gray-100 rounded-xl p-4 text-left hover:border-cortex-purple cursor-pointer shadow-sm group">
-                        <div className="text-gray-400 mb-2 group-hover:text-cortex-purple">{c.i}</div>
+                    {[{i:<Clock size={16}/>,t:"Synthesize Data",d:"Summarize my technical notes."},{i:<Lightbulb size={16}/>,t:"Brainstorm",d:"Ideas for a tech startup name."},{i:<Compass size={16}/>,t:"Check Facts",d:"Latest AI model benchmarks."}].map((c,i)=>(
+                      <div key={i} onClick={()=>send("text",c.d)} className="bg-white border border-gray-100 rounded-xl p-4 text-left hover:border-cortex-purple cursor-pointer shadow-sm group transition-all">
+                        <div className="text-gray-400 mb-2 group-hover:text-cortex-purple transition">{c.i}</div>
                         <div className="font-semibold text-[13px]">{c.t}</div>
                         <div className="text-[11px] text-gray-500 leading-tight mt-1">{c.d}</div>
                       </div>
@@ -232,41 +357,73 @@ export default function ChatApp() {
                 <div className="max-w-3xl mx-auto space-y-6">
                   {messages.map((m, i) => (
                     <motion.div key={i} initial={{opacity:0,y:5}} animate={{opacity:1,y:0}} className={`flex ${m.role==="user"?"justify-end":"justify-start"} group`}>
-                      {m.role==="assistant" && <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cortex-purple to-purple-400 flex items-center justify-center shrink-0 mr-3 mt-1 shadow-sm"><Sparkles size={14} className="text-white"/></div>}
+                      {m.role==="assistant" && (
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cortex-purple to-purple-400 flex items-center justify-center shrink-0 mr-3 mt-1 shadow-sm">
+                          <Sparkles size={14} className="text-white"/>
+                        </div>
+                      )}
                       <div className={`relative max-w-[85%] ${m.role==="user" ? "bg-gray-100 text-gray-900 rounded-2xl rounded-tr-sm px-5 py-3" : "bg-transparent text-gray-900 w-full"}`}>
-                        {m.content==="" && m.role==="assistant" ? <Loader2 size={18} className="animate-spin text-cortex-purple my-2" /> : m.content.startsWith("![") ? (
-                          <img src={m.content.match(/\((.*?)\)/)?.[1]} alt="Gen" className="rounded-xl w-full max-w-md shadow-md border" />
+                        {m.content==="" && m.role==="assistant" ? (
+                          <div className="flex gap-1.5 py-4"><span className="w-2 h-2 bg-cortex-purple rounded-full animate-bounce"/><span className="w-2 h-2 bg-cortex-purple rounded-full animate-bounce [animation-delay:0.2s]"/><span className="w-2 h-2 bg-cortex-purple rounded-full animate-bounce [animation-delay:0.4s]"/></div>
+                        ) : m.content.startsWith("![") ? (
+                          <div className="mt-2"><img src={m.content.match(/\((.*?)\)/)?.[1]} alt="Gen" className="rounded-xl w-full max-w-md shadow-md border" /></div>
                         ) : (
-                          <ReactMarkdown className="markdown-body text-[15px] leading-relaxed">{m.content}</ReactMarkdown>
+                          <div className="markdown-body prose prose-sm max-w-none text-[15px] leading-relaxed">
+                            <ReactMarkdown>{m.content}</ReactMarkdown>
+                          </div>
                         )}
                         {m.role==="assistant" && m.content!=="" && (
                           <div className="flex items-center gap-1 mt-2 opacity-0 group-hover:opacity-100 transition">
-                            <button onClick={()=>handleCopy(m.content,i)} className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-md">{copied===i?<Check size={14} className="text-green-500"/>:<Copy size={14}/>}</button>
-                            <button onClick={()=>speak(m.content)} className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-md"><Volume2 size={14}/></button>
+                            <button onClick={()=>handleCopy(m.content,i)} className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-md" title="Copy">
+                              {copied===i?<Check size={14} className="text-green-500"/>:<Copy size={14}/>}
+                            </button>
+                            <button onClick={()=>speak(m.content)} className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-md" title="Listen">
+                              <Volume2 size={14}/>
+                            </button>
                           </div>
                         )}
                       </div>
                     </motion.div>
                   ))}
-                  {loading && messages[messages.length-1].role==="user" && <div className="flex justify-start items-center gap-3"><div className="w-8 h-8 rounded-full bg-gradient-to-br from-cortex-purple to-purple-400 flex items-center justify-center"><Sparkles size={14} className="text-white"/></div><span className="w-2 h-2 bg-cortex-purple rounded-full animate-bounce"/><span className="w-2 h-2 bg-cortex-purple rounded-full animate-bounce" style={{animationDelay:"0.2s"}}/><span className="w-2 h-2 bg-cortex-purple rounded-full animate-bounce" style={{animationDelay:"0.4s"}}/></div>}
+                  {loading && messages[messages.length-1].role==="user" && (
+                    <div className="flex justify-start items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cortex-purple to-purple-400 flex items-center justify-center shrink-0">
+                        <Sparkles size={14} className="text-white"/>
+                      </div>
+                      <div className="flex gap-1.5 px-4 py-2 bg-gray-50 rounded-2xl border border-gray-100">
+                        <span className="w-1.5 h-1.5 bg-cortex-purple rounded-full animate-pulse"/>
+                        <span className="w-1.5 h-1.5 bg-cortex-purple rounded-full animate-pulse [animation-delay:0.2s]"/>
+                        <span className="w-1.5 h-1.5 bg-cortex-purple rounded-full animate-pulse [animation-delay:0.4s]"/>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
 
-            {/* Sticky Input for active chat */}
+            {/* Floating Input bar */}
             {messages.length > 0 && (
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-full max-w-3xl px-4 z-20">
-                <div className="bg-white border border-gray-200 shadow-[0_5px_20px_rgba(0,0,0,0.08)] rounded-2xl p-1.5 flex items-end gap-2">
-                  <div className="flex flex-col flex-1 bg-gray-50 rounded-xl px-3 py-2 border border-transparent focus-within:border-gray-200 focus-within:bg-white transition">
-                    <textarea value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}}} placeholder="Ask me anything..." className="w-full bg-transparent resize-none outline-none text-[14px] min-h-[40px] max-h-32 custom-scrollbar" />
-                    <div className="flex items-center gap-2 mt-1">
-                      <button onClick={handleVoice} className="text-gray-400 hover:text-gray-700"><Mic size={14}/></button>
-                      <button onClick={()=>send("image")} className="text-gray-400 hover:text-gray-700"><ImageIcon size={14}/></button>
+              <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-full max-w-3xl px-4 z-20">
+                <div className="bg-white border border-gray-200 shadow-[0_10px_40px_rgba(0,0,0,0.12)] rounded-3xl p-1.5 flex items-end gap-2 backdrop-blur-md bg-white/95">
+                  <div className="flex flex-col flex-1 bg-gray-50/50 rounded-2xl px-3 py-2 border border-transparent focus-within:border-gray-200 focus-within:bg-white transition-all duration-300">
+                    <textarea 
+                      value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}}} 
+                      placeholder="Type a message..." className="w-full bg-transparent resize-none outline-none text-[15px] min-h-[44px] max-h-40 py-2.5 custom-scrollbar" 
+                    />
+                    <div className="flex items-center gap-3 mt-1 pb-1">
+                      <button onClick={handleVoice} className="text-gray-400 hover:text-cortex-purple transition" title="Voice"><Mic size={16}/></button>
+                      <button onClick={()=>send("image")} className="text-gray-400 hover:text-cortex-purple transition" title="Image"><ImageIcon size={16}/></button>
+                      <label htmlFor="fileup" className="text-gray-400 hover:text-cortex-purple transition cursor-pointer" title="File"><Paperclip size={16}/></label>
                     </div>
                   </div>
-                  <button onClick={()=>send()} disabled={loading||!input.trim()} className="w-10 h-10 mb-1 shrink-0 bg-black disabled:bg-gray-300 text-white rounded-xl flex items-center justify-center hover:bg-gray-800 transition shadow-md">{loading?<Loader2 size={16} className="animate-spin"/>:<Send size={16}/>}</button>
+                  <button 
+                    onClick={()=>send()} disabled={loading||!input.trim()} 
+                    className="w-12 h-12 mb-1 shrink-0 bg-black disabled:bg-gray-200 text-white rounded-2xl flex items-center justify-center hover:bg-gray-800 transition shadow-md"
+                  >
+                    {loading ? <Loader2 size={18} className="animate-spin"/> : <Send size={18} className="-ml-0.5" />}
+                  </button>
                 </div>
-                <div className="text-center mt-2"><span className="text-[10px] text-gray-400 font-medium flex items-center justify-center gap-1"><Check size={10}/> Auto-saved</span></div>
+                <div className="text-center mt-3"><span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest flex items-center justify-center gap-1.5 opacity-80"><Check size={10} className="text-green-500"/> Chat Encrypted & Auto-saved</span></div>
               </div>
             )}
           </div>
