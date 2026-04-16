@@ -100,19 +100,29 @@ export default function ChatApp() {
     const token = getToken();
     let cId: string | null = activeId;
     
+    // Safety check: Only try to create a new chat if we don't have one
     if (!cId) {
-      const res = await fetch("/api/chat", { 
-        method: "POST", 
-        headers: { 
-          "Content-Type": "application/json", 
-          Authorization: `Bearer ${token}` 
-        }, 
-        body: JSON.stringify({ title: txt.substring(0, 30) }) 
-      });
-      const n = await res.json();
-      cId = n._id;
-      setActiveId(cId);
-      setChats(prev => [{ _id: n._id, title: n.title, updatedAt: new Date().toISOString() }, ...prev]);
+      try {
+        const res = await fetch("/api/chat", { 
+          method: "POST", 
+          headers: { 
+            "Content-Type": "application/json", 
+            Authorization: `Bearer ${token}` 
+          }, 
+          body: JSON.stringify({ title: txt.substring(0, 30) }) 
+        });
+        
+        if (res.ok) {
+          const n = await res.json();
+          if (n && n._id) {
+            cId = n._id;
+            setActiveId(cId);
+            setChats(prev => [{ _id: n._id, title: n.title, updatedAt: new Date().toISOString() }, ...prev]);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to create chat in DB", err);
+      }
     }
 
     const currentMessages = [...messages, { role: "user" as const, content: txt }];
@@ -128,9 +138,17 @@ export default function ChatApp() {
           headers: { "Content-Type": "application/json" }, 
           body: JSON.stringify({ prompt: txt }) 
         });
+        
         const d = await res.json();
+        
+        // Handle the new error format from the backend
+        if (!res.ok || d.error) {
+          throw new Error(d.error || "Image generation failed");
+        }
+        
         const aiMsg = { role: "assistant" as const, content: `![Gen](${d.url})` };
         setMessages([...currentMessages, aiMsg]);
+        
         if (cId) {
           await fetch(`/api/chat/${cId}`, { 
             method: "PATCH", 
@@ -146,7 +164,7 @@ export default function ChatApp() {
         });
         
         const reader = res.body?.getReader();
-        if (!reader) throw new Error("Failed to read stream");
+        if (!reader) throw new Error("Failed to read stream. Ensure the API is returning a proper stream response.");
         
         const decoder = new TextDecoder();
         setMessages([...currentMessages, { role: "assistant", content: "" }]);
