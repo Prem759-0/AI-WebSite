@@ -18,7 +18,6 @@ export async function POST(req: Request) {
         "X-Title": "Cortex AI"
       },
       body: JSON.stringify({
-        // Note: OpenRouter image models usually require paid credits.
         model: "sourceful/riverflow-v2-pro", 
         messages: [{
           role: "user",
@@ -29,7 +28,6 @@ export async function POST(req: Request) {
 
     if (!response.ok) {
       const errText = await response.text();
-      // This will now send the EXACT OpenRouter error back to your frontend
       return NextResponse.json({ error: `OpenRouter Image Error: ${errText}` }, { status: response.status });
     }
 
