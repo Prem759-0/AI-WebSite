@@ -4,19 +4,12 @@ export const MODEL_MAP: Record<string, string> = {
   roleplay: "z-ai/glm-4.5-air:free",
   tech: "nvidia/nemotron-3-super-120b-a12b:free",
   science: "nvidia/nemotron-3-super-120b-a12b:free",
-  translate: "minimax/minimax-m2.5:free",
-  finance: "openai/gpt-oss-120b:free",
-  seo: "openai/gpt-oss-120b:free"
+  translate: "minimax/minimax-m2.5:free"
 };
-
 export function detectIntent(message: string): string {
   const msg = message.toLowerCase();
-  
-  if (msg.includes("code") || msg.includes("error") || msg.includes("bug")) return "code";
-  if (msg.includes("translate") || msg.includes("meaning")) return "translate";
-  if (msg.includes("story") || msg.includes("imagine") || msg.includes("roleplay")) return "roleplay";
-  if (msg.includes("science") || msg.includes("how does") || msg.includes("explain deeply")) return "science";
-  if (msg.includes("money") || msg.includes("seo") || msg.includes("business")) return "finance";
-  
+  if (msg.match(/code|bug|error|function|react/)) return "code";
+  if (msg.match(/translate|meaning|language/)) return "translate";
+  if (msg.match(/science|physics|explain/)) return "science";
   return "text";
 }
