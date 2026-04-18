@@ -208,8 +208,17 @@ export default function ChatApp() {
     r.start();
   };
 
+  // --- NEW: Universal File Parser ---
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]; if (!f) return;
+    
+    // Prevent unreadable binary files from crashing the browser reader
+    if (f.name.endsWith('.pdf') || f.name.endsWith('.docx')) {
+      showToast("For PDFs or Word Docs, please upload them online and paste the URL in the chat! Cortex will read the link live.", "error");
+      e.target.value = ''; 
+      return;
+    }
+
     const r = new FileReader(); 
     if (f.type.startsWith("image/")) {
       r.onload = ev => {
@@ -223,7 +232,7 @@ export default function ChatApp() {
       r.onload = ev => {
         if (typeof ev.target?.result === 'string') {
           setAttachedFile({ name: f.name, content: ev.target.result, isImage: false });
-          showToast("Document attached");
+          showToast(`Document parsed: ${f.name}`);
         }
       }; 
       r.readAsText(f);
@@ -516,7 +525,6 @@ export default function ChatApp() {
             {messages.length === 0 ? (
               <div className="max-w-2xl mx-auto flex flex-col items-center mt-8 md:mt-20 text-center w-full">
                 
-                {/* The Pure Black background makes the GIF perfectly seamless */}
                 <div className="w-32 h-32 md:w-48 md:h-48 mb-6 md:mb-8 relative flex items-center justify-center mix-blend-screen pointer-events-none">
                   <img src="/ai_logo_video.gif" alt="Cortex AI" className="w-full h-full object-contain scale-[1.2]" />
                 </div>
