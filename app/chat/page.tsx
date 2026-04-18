@@ -24,7 +24,6 @@ const MODELS = [
 ];
 
 export default function ChatApp() {
-  // Safe generic declarations for SWC Compiler
   const [chats, setChats] = useState< Array<ChatInfo> >([]);
   const [activeId, setActiveId] = useState< string | null >(null);
   const [messages, setMessages] = useState< Array<Message> >([]);
@@ -273,7 +272,6 @@ export default function ChatApp() {
 
   const filteredChats = chats.filter(c => c.title.toLowerCase().includes(search.toLowerCase()));
 
-  // 100% Compiler-Safe Renderers using an arrow function directly
   const renderers = {
     code: (props: any) => {
       const { node, inline, className, children, ...rest } = props;
@@ -422,7 +420,21 @@ export default function ChatApp() {
           <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto px-4 md:px-8 py-8 custom-scrollbar pb-40">
             {messages.length === 0 ? (
               <div className="max-w-2xl mx-auto flex flex-col items-center mt-10 md:mt-20 text-center">
-                <div className="cortex-orb mb-12" />
+                
+                {/* --- VIDEO ORB INTEGRATION HERE --- */}
+                <div className="w-48 h-48 mb-8 relative flex items-center justify-center mix-blend-screen pointer-events-none">
+                  <video 
+                    autoPlay 
+                    loop 
+                    muted 
+                    playsInline 
+                    className="w-full h-full object-contain scale-[1.1]"
+                  >
+                    <source src="/ai_logo_video.mp4" type="video/mp4" />
+                  </video>
+                </div>
+                {/* ---------------------------------- */}
+
                 <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-8 text-white">How can I help you?</h1>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full max-w-3xl mt-8">
                   {[{i:<ImageIcon/>,t:"Generate Image",d:"A cyberpunk city at night", m:"image"}, {i:<Lightbulb/>,t:"Write Code",d:"Create a React login form", m:"text"}, {i:<Globe/>,t:"Web Search",d:"Latest AI news today", m:"text", w:true}].map((c,i)=>(
@@ -453,6 +465,7 @@ export default function ChatApp() {
                           </div>
                         ) : (
                           <>
+                            {m.content.includes("[Attached Image:") && m.content.includes("data:image")}
                             {m.content==="" && m.role==="assistant" ? (
                               <div className="flex gap-1.5 py-2"><span className="w-2.5 h-2.5 bg-cortex-purple rounded-full animate-bounce"/><span className="w-2.5 h-2.5 bg-cortex-purple rounded-full animate-bounce [animation-delay:0.2s]"/><span className="w-2.5 h-2.5 bg-cortex-purple rounded-full animate-bounce [animation-delay:0.4s]"/></div>
                             ) : m.content.startsWith("![") ? (
