@@ -10,9 +10,12 @@ import {
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
+// Safely extracted types to prevent Next.js compiler crashes
 type Message = { role: "user" | "assistant", content: string };
 type ChatInfo = { _id: string, title: string, updatedAt: string };
 type Toast = { msg: string, type: "success" | "error" } | null;
+type ViewMode = "chat" | "settings" | "profile" | "explore";
+type AttachedFile = { name: string, content: string } | null;
 
 const MODELS = [
   { id: "auto", name: "Cortex Auto", desc: "Best for everyday tasks" },
@@ -30,7 +33,7 @@ export default function ChatApp() {
   const [user, setUser] = useState({ name: "User", email: "" });
   const [copied, setCopied] = useState<number | null>(null);
   const [search, setSearch] = useState("");
-  const [view, setView] = useState<"chat"|"settings"|"profile"|"explore">("chat");
+  const [view, setView] = useState<ViewMode>("chat");
   
   // Advanced Features State
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -43,7 +46,7 @@ export default function ChatApp() {
   
   // Ultra Premium Features
   const [toast, setToast] = useState<Toast>(null);
-  const [attachedFile, setAttachedFile] = useState<{name: string, content: string} | null>(null);
+  const [attachedFile, setAttachedFile] = useState<AttachedFile>(null);
   
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -145,7 +148,7 @@ export default function ChatApp() {
       }
     }; 
     r.readAsText(f);
-    e.target.value = ''; // Reset input
+    e.target.value = ''; 
   };
 
   const exportChat = () => {
@@ -191,11 +194,10 @@ export default function ChatApp() {
     const txt = forcedInput || input;
     if ((!txt.trim() && !attachedFile) || loading) return;
     
-    // Construct final prompt with attached file if exists
     let finalPrompt = txt;
     if (attachedFile && !overrideMessages) {
       finalPrompt = `[Context from attached file: ${attachedFile.name}]\n${attachedFile.content}\n\n[User Request]\n${txt}`;
-      setAttachedFile(null); // Clear attachment after use
+      setAttachedFile(null); 
     }
 
     abortControllerRef.current = new AbortController();
@@ -386,7 +388,131 @@ export default function ChatApp() {
                 <h1 className="text-4xl md:text-5xl font-semibold tracking-tight mb-8 bg-gradient-to-br from-gray-900 to-gray-600 bg-clip-text text-transparent">How can I help you?</h1>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full max-w-3xl mt-8">
                   {[{i:<ImageIcon/>,t:"Generate Image",d:"A cyberpunk city at night", m:"image"}, {i:<Lightbulb/>,t:"Write Code",d:"Create a React login form", m:"text"}, {i:<Globe/>,t:"Web Search",d:"Latest AI news today", m:"text", w:true}].map((c,i)=>(
-                    <motion.div whileHover={{ y: -5 }} key={i} onClick={()=>{ if(c.w) setWebSearchEnabled(true); send(c.m as any, c.d); }} className="bg-white border border-gray-100 rounded-2xl p-5 text-left hover:border-cortex-purple hover:shadow-[0_8px_30px_rgb(168,127,251,0.12)] cursor-pointer transition-all duration-300 group">
+                    <motion.div whileHover={{ y: -5 }} key={i} onClick={()=>{ if(c.w) setWebSearchEnabled(true); send(c.m as "text" | "image", c.d); }} className="bg-white border border-gray-100 rounded-2xl p-5 text-left hover:border-cortex-purple hover:shadow-[0_8px_30px_rgb(168,127,251,0.12)] cursor-pointer transition-all duration-300 group">
                       <div className="text-gray-400 mb-3 group-hover:text-cortex-purple transition bg-gray-50 w-10 h-10 rounded-full flex items-center justify-center group-hover:bg-cortex-purple/10">{c.i}</div>
                       <div className="font-bold text-[14px]">{c.t}</div>
-                      <div className="text-[12px] text
+                      <div className="text-[12px] text-gray-500 mt-1">{c.d}</div>
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="max-w-3xl mx-auto space-y-8">
+                <AnimatePresence>
+                  {messages.map((m, i) => (
+                    <motion.div layout initial={{opacity:0,y:10, scale: 0.98}} animate={{opacity:1,y:0, scale: 1}} key={i} className={`flex ${m.role==="user"?"justify-end":"justify-start"} group`}>
+                      {m.role==="assistant" && <div className="w-9 h-9 rounded-full bg-gradient-to-br from-cortex-purple to-purple-500 flex items-center justify-center shrink-0 mr-4 mt-1 shadow-md shadow-purple-200"><Sparkles size={16} className="text-white"/></div>}
+                      
+                      <div className={`relative max-w-[85%] ${m.role==="user" ? "bg-[#f3f4f6] text-gray-900 rounded-3xl rounded-tr-sm px-6 py-3.5" : "bg-white text-gray-900 w-full rounded-3xl rounded-tl-sm px-6 py-5 shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-gray-100"}`}>
+                        
+                        {editingMsgIndex === i && m.role === "user" ? (
+                          <div className="flex flex-col gap-3">
+                            <textarea value={editMsgContent} onChange={e=>setEditMsgContent(e.target.value)} className="w-full bg-white p-3 rounded-xl border border-gray-200 outline-none text-sm resize-none" rows={3}/>
+                            <div className="flex justify-end gap-2">
+                              <button onClick={()=>setEditingMsgIndex(null)} className="px-4 py-1.5 text-sm font-medium rounded-xl hover:bg-gray-200 transition">Cancel</button>
+                              <button onClick={saveEditedMessage} className="px-4 py-1.5 text-sm font-medium bg-black text-white rounded-xl hover:bg-gray-800 transition">Save & Submit</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            {m.content==="" && m.role==="assistant" ? (
+                              <div className="flex gap-1.5 py-2"><span className="w-2.5 h-2.5 bg-cortex-purple rounded-full animate-bounce"/><span className="w-2.5 h-2.5 bg-cortex-purple rounded-full animate-bounce [animation-delay:0.2s]"/><span className="w-2.5 h-2.5 bg-cortex-purple rounded-full animate-bounce [animation-delay:0.4s]"/></div>
+                            ) : m.content.startsWith("![") ? (
+                              <div className="mt-1"><img src={m.content.match(/\((.*?)\)/)?.[1]} alt="Generated" className="rounded-2xl w-full max-w-md shadow-lg border border-gray-100" /></div>
+                            ) : (
+                              <div className="text-[15.5px] leading-relaxed [&>p]:mb-4 last:[&>p]:mb-0 [&>pre]:bg-[#1a1b26] [&>pre]:text-gray-100 [&>pre]:p-5 [&>pre]:rounded-2xl [&>pre]:overflow-x-auto [&>pre]:my-4 [&>pre]:shadow-inner [&>code]:bg-purple-50 [&>code]:text-cortex-purple [&>code]:px-1.5 [&>code]:py-0.5 [&>code]:rounded-md [&>code]:font-medium [&>ul]:list-disc [&>ul]:ml-6 [&>ul]:mb-4 [&>ol]:list-decimal [&>ol]:ml-6 [&>ol]:mb-4">
+                                <ReactMarkdown>{m.content}</ReactMarkdown>
+                              </div>
+                            )}
+
+                            {!loading && m.content !== "" && (
+                              <div className={`absolute ${m.role === 'user' ? 'bottom-[-30px] right-2' : 'bottom-[-35px] left-0'} flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity`}>
+                                {m.role === "user" ? (
+                                  <button onClick={() => { setEditingMsgIndex(i); setEditMsgContent(m.content); }} className="p-1.5 text-gray-500 hover:text-cortex-purple rounded-lg bg-white border border-gray-100 shadow-sm transition"><Edit2 size={14}/></button>
+                                ) : (
+                                  <>
+                                    <button onClick={()=>handleCopy(m.content,i)} className="p-1.5 text-gray-500 hover:text-cortex-purple rounded-lg bg-white border border-gray-100 shadow-sm transition" title="Copy">{copied===i?<Check size={14} className="text-green-500"/>:<Copy size={14}/>}</button>
+                                    <button onClick={()=>regenerate(i)} className="p-1.5 text-gray-500 hover:text-cortex-purple rounded-lg bg-white border border-gray-100 shadow-sm transition" title="Regenerate"><RefreshCw size={14}/></button>
+                                  </>
+                                )}
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+                
+                {/* Typing Indicator for Loading State */}
+                {loading && messages[messages.length-1]?.role==="user" && (
+                  <motion.div initial={{opacity:0, y:10}} animate={{opacity:1, y:0}} className="flex justify-start items-center gap-4">
+                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-cortex-purple to-purple-500 flex items-center justify-center shrink-0 shadow-md"><Sparkles size={16} className="text-white"/></div>
+                    <div className="flex gap-1.5 px-5 py-4 bg-white rounded-3xl rounded-tl-sm border border-gray-100 shadow-[0_2px_15px_rgb(0,0,0,0.03)]">
+                      <span className="w-2 h-2 bg-cortex-purple/60 rounded-full animate-pulse"/><span className="w-2 h-2 bg-cortex-purple/80 rounded-full animate-pulse [animation-delay:0.2s]"/><span className="w-2 h-2 bg-cortex-purple rounded-full animate-pulse [animation-delay:0.4s]"/>
+                    </div>
+                  </motion.div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Premium Input Bar with File Preview & Animated Glow */}
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-full max-w-3xl px-4 z-20">
+            <motion.div layout className={`bg-white border shadow-[0_8px_30px_rgb(0,0,0,0.08)] rounded-[2rem] p-2 flex flex-col gap-2 backdrop-blur-2xl bg-white/90 transition-all duration-500 ${loading ? 'border-cortex-purple/50 shadow-[0_0_30px_rgb(168,127,251,0.2)]' : 'border-gray-200 hover:border-gray-300 focus-within:border-cortex-purple/40 focus-within:ring-4 focus-within:ring-cortex-purple/10'}`}>
+              
+              {/* File Attachment Pill UI */}
+              <AnimatePresence>
+                {attachedFile && (
+                  <motion.div initial={{ opacity: 0, height: 0, scale: 0.9 }} animate={{ opacity: 1, height: 'auto', scale: 1 }} exit={{ opacity: 0, height: 0, scale: 0.9 }} className="px-3 pt-2">
+                    <div className="flex items-center justify-between bg-purple-50 border border-purple-100 rounded-xl p-3 w-max max-w-xs shadow-sm">
+                      <div className="flex items-center gap-3 overflow-hidden">
+                        <div className="bg-white p-2 rounded-lg text-cortex-purple shadow-sm"><FileText size={18}/></div>
+                        <div className="flex flex-col truncate">
+                          <span className="text-xs font-bold text-gray-800 truncate">{attachedFile.name}</span>
+                          <span className="text-[10px] text-gray-500">Document ready</span>
+                        </div>
+                      </div>
+                      <button onClick={() => setAttachedFile(null)} className="ml-4 p-1.5 text-gray-400 hover:text-red-500 hover:bg-white rounded-lg transition"><X size={14}/></button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <div className="flex items-end gap-2 w-full">
+                <div className="flex flex-col flex-1 bg-gray-50/50 rounded-3xl px-4 py-2 border border-transparent transition-all duration-300">
+                  <textarea 
+                    ref={inputRef} value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}}} 
+                    placeholder="Ask Cortex anything..." className="w-full bg-transparent resize-none outline-none text-[15.5px] min-h-[44px] max-h-40 py-2.5 custom-scrollbar text-gray-800 placeholder:text-gray-400 font-medium" 
+                  />
+                  <div className="flex items-center gap-2 mt-1 pb-1">
+                    <button onClick={handleVoice} className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:text-cortex-purple hover:bg-purple-50 transition" title="Voice Input"><Mic size={18}/></button>
+                    <button onClick={()=>send("image")} className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:text-cortex-purple hover:bg-purple-50 transition" title="Generate Image"><ImageIcon size={18}/></button>
+                    <label htmlFor="fileup" className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:text-cortex-purple hover:bg-purple-50 transition cursor-pointer" title="Attach File"><Paperclip size={18}/></label>
+                    <input type="file" id="fileup" className="hidden" accept=".txt,.md,.csv" onChange={handleFile} />
+                    
+                    <div className="w-px h-4 bg-gray-200 mx-1"></div>
+                    <button onClick={()=>setWebSearchEnabled(!webSearchEnabled)} className={`px-3 h-8 flex items-center gap-1.5 text-xs font-bold rounded-full transition ${webSearchEnabled ? 'text-blue-600 bg-blue-50 border border-blue-100' : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100 border border-transparent'}`} title="Toggle Web Search">
+                      <Globe size={14}/> {webSearchEnabled ? 'Search On' : 'Search'}
+                    </button>
+                  </div>
+                </div>
+                
+                {loading ? (
+                  <button onClick={stopGenerating} className="w-12 h-12 mb-1 shrink-0 bg-gray-900 text-white rounded-[1.2rem] flex items-center justify-center hover:bg-black transition-all shadow-lg hover:scale-105 active:scale-95">
+                    <StopCircle size={20} className="text-red-400" />
+                  </button>
+                ) : (
+                  <button onClick={()=>send()} disabled={(!input.trim() && !attachedFile)} className="w-12 h-12 mb-1 shrink-0 bg-black disabled:bg-gray-200 disabled:shadow-none text-white rounded-[1.2rem] flex items-center justify-center hover:bg-gray-800 transition-all shadow-lg shadow-gray-300 hover:scale-105 active:scale-95">
+                    <Send size={20} className="-ml-0.5" />
+                  </button>
+                )}
+              </div>
+            </motion.div>
+            <div className="text-center mt-3"><span className="text-[11px] text-gray-400 font-semibold flex items-center justify-center gap-1.5"><Check size={12} className="text-green-500"/> End-to-end encrypted • Cortex Advanced 1.0</span></div>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
