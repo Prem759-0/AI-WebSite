@@ -1,21 +1,20 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, UIEvent } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
-  Plus, Search, Compass, Book, Folder, Clock, Download, 
+  Plus, Search, Compass, Book, Folder, Download, 
   Settings, Mic, Paperclip, Send, Loader2, Image as ImageIcon, 
   Lightbulb, Sparkles, LogOut, PanelLeftClose, PanelLeft, Copy, Check, Volume2, 
-  Trash2, Edit2, X, RefreshCw, StopCircle, ChevronDown, Globe, FileText, AlertCircle
+  Trash2, Edit2, X, RefreshCw, StopCircle, ChevronDown, Globe, FileText, AlertCircle, ArrowDown, Eraser
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
-// Safely extracted types to prevent Next.js compiler crashes
 type Message = { role: "user" | "assistant", content: string };
 type ChatInfo = { _id: string, title: string, updatedAt: string };
 type Toast = { msg: string, type: "success" | "error" } | null;
 type ViewMode = "chat" | "settings" | "profile" | "explore";
-type AttachedFile = { name: string, content: string } | null;
+type AttachedFile = { name: string, content: string, isImage?: boolean } | null;
 
 const MODELS = [
   { id: "auto", name: "Cortex Auto", desc: "Best for everyday tasks" },
@@ -31,11 +30,11 @@ export default function ChatApp() {
   const [loading, setLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [user, setUser] = useState({ name: "User", email: "" });
-  const [copied, setCopied] = useState<number | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [view, setView] = useState<ViewMode>("chat");
+  const [showScrollButton, setShowScrollButton] = useState(false);
   
-  // Advanced Features State
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [selectedModel, setSelectedModel] = useState(MODELS[0]);
@@ -44,7 +43,6 @@ export default function ChatApp() {
   const [editingMsgIndex, setEditingMsgIndex] = useState<number | null>(null);
   const [editMsgContent, setEditMsgContent] = useState("");
   
-  // Ultra Premium Features
   const [toast, setToast] = useState<Toast>(null);
   const [attachedFile, setAttachedFile] = useState<AttachedFile>(null);
   
@@ -85,9 +83,19 @@ export default function ChatApp() {
     }
   }, [activeId]);
 
-  useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages, loading]);
+  const scrollToBottom = () => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+    }
+  };
+
+  useEffect(() => { scrollToBottom(); }, [messages, loading]);
+
+  const handleScroll = (e: UIEvent<HTMLDivElement>) => {
+    const target = e.currentTarget;
+    const isNearBottom = target.scrollHeight - target.scrollTop - target.clientHeight < 100;
+    setShowScrollButton(!isNearBottom);
+  };
 
   const autoResizeInput = () => {
     if (inputRef.current) {
@@ -99,6 +107,12 @@ export default function ChatApp() {
   useEffect(() => { autoResizeInput(); }, [input]);
 
   const newChat = () => { setActiveId(null); setMessages([]); setView("chat"); setAttachedFile(null); if (window.innerWidth < 768) setSidebarOpen(false); };
+
+  const clearContext = () => {
+    if (!confirm("Clear this conversation's memory? (You will stay in the same chat, but the AI will forget previous messages).")) return;
+    setMessages([]);
+    showToast("Chat memory cleared");
+  };
 
   const deleteChat = async (id: string) => {
     if (!confirm("Delete this chat permanently?")) return;
@@ -120,14 +134,14 @@ export default function ChatApp() {
     } catch (e) {}
   };
 
-  const handleCopy = (text: string, i: number) => { 
+  const handleCopy = (text: string, id: string) => { 
     navigator.clipboard.writeText(text); 
-    setCopied(i); 
+    setCopied(id); 
     showToast("Copied to clipboard");
     setTimeout(() => setCopied(null), 2000); 
   };
   
-  const speak = (text: string) => { window.speechSynthesis.speak(new SpeechSynthesisUtterance(text.replace(/[*#]/g, ""))); };
+  const speak = (text: string) => { window.speechSynthesis.speak(new SpeechSynthesisUtterance(text.replace(/[*#`]/g, ""))); };
 
   const handleVoice = () => {
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -141,13 +155,24 @@ export default function ChatApp() {
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]; if (!f) return;
     const r = new FileReader(); 
-    r.onload = ev => {
-      if (typeof ev.target?.result === 'string') {
-        setAttachedFile({ name: f.name, content: ev.target.result });
-        showToast("File attached");
-      }
-    }; 
-    r.readAsText(f);
+    
+    if (f.type.startsWith("image/")) {
+      r.onload = ev => {
+        if (typeof ev.target?.result === 'string') {
+          setAttachedFile({ name: f.name, content: ev.target.result, isImage: true });
+          showToast("Image attached");
+        }
+      }; 
+      r.readAsDataURL(f);
+    } else {
+      r.onload = ev => {
+        if (typeof ev.target?.result === 'string') {
+          setAttachedFile({ name: f.name, content: ev.target.result, isImage: false });
+          showToast("Document attached");
+        }
+      }; 
+      r.readAsText(f);
+    }
     e.target.value = ''; 
   };
 
@@ -196,7 +221,10 @@ export default function ChatApp() {
     
     let finalPrompt = txt;
     if (attachedFile && !overrideMessages) {
-      finalPrompt = `[Context from attached file: ${attachedFile.name}]\n${attachedFile.content}\n\n[User Request]\n${txt}`;
+      // If it's an image, we send the base64 URL. If it's a doc, we send the raw text.
+      finalPrompt = attachedFile.isImage 
+        ? `[Attached Image: ${attachedFile.name}]\n${attachedFile.content}\n\n[User Request]: ${txt}` 
+        : `[Context from attached document: ${attachedFile.name}]\n${attachedFile.content}\n\n[User Request]: ${txt}`;
       setAttachedFile(null); 
     }
 
@@ -206,7 +234,7 @@ export default function ChatApp() {
     
     if (!cId) {
       try {
-        const res = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ title: txt.substring(0, 30) || "New Document Chat" }) });
+        const res = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ title: txt.substring(0, 30) || "New Workspace" }) });
         if (res.ok) {
           const n = await res.json();
           if (n && n._id) { cId = n._id; setActiveId(cId); setChats(prev => [{ _id: n._id, title: n.title, updatedAt: new Date().toISOString() }, ...prev]); }
@@ -268,10 +296,46 @@ export default function ChatApp() {
 
   const filteredChats = chats.filter(c => c.title.toLowerCase().includes(search.toLowerCase()));
 
+  // Custom components for ReactMarkdown to render Mac-Style Code Blocks
+  const renderers = {
+    code({ node, inline, className, children, ...props }: any) {
+      const match = /language-(\w+)/.exec(className || '');
+      const codeString = String(children).replace(/\n$/, '');
+      const codeId = Math.random().toString(36).substring(7);
+
+      return !inline && match ? (
+        <div className="relative my-5 rounded-2xl overflow-hidden bg-[#1a1b26] border border-gray-800 shadow-xl group/code">
+          <div className="flex items-center justify-between px-4 py-2.5 bg-[#24283b] border-b border-gray-800">
+            <div className="flex items-center gap-2">
+              <div className="flex gap-1.5 mr-2">
+                <div className="w-3 h-3 rounded-full bg-[#ff5f56]"></div>
+                <div className="w-3 h-3 rounded-full bg-[#ffbd2e]"></div>
+                <div className="w-3 h-3 rounded-full bg-[#27c93f]"></div>
+              </div>
+              <span className="text-gray-400 text-xs font-medium uppercase tracking-wider">{match[1]}</span>
+            </div>
+            <button 
+              onClick={() => handleCopy(codeString, codeId)} 
+              className="text-gray-400 hover:text-white transition flex items-center gap-1.5 text-xs font-medium bg-gray-800/50 hover:bg-gray-700 px-2 py-1 rounded-md"
+            >
+              {copied === codeId ? <><Check size={14} className="text-green-500"/> Copied</> : <><Copy size={14}/> Copy</>}
+            </button>
+          </div>
+          <div className="p-5 overflow-x-auto">
+            <code className={`${className} text-gray-100 text-[14px] font-mono leading-relaxed`} {...props}>{children}</code>
+          </div>
+        </div>
+      ) : (
+        <code className="bg-purple-100/50 text-cortex-purple px-1.5 py-0.5 rounded-md font-mono text-[13.5px] font-semibold" {...props}>
+          {children}
+        </code>
+      );
+    }
+  };
+
   return (
     <div className="h-screen w-full bg-[#f4f3f7] p-2 md:p-4 flex gap-4 overflow-hidden font-sans text-gray-900 relative">
       
-      {/* Premium Toast Notification System */}
       <AnimatePresence>
         {toast && (
           <motion.div 
@@ -350,7 +414,6 @@ export default function ChatApp() {
           <div className="flex items-center gap-3 relative">
             {!sidebarOpen && <button onClick={() => setSidebarOpen(true)} className="p-2 hover:bg-gray-100 rounded-xl text-gray-600 transition"><PanelLeft size={20}/></button>}
             
-            {/* Model Selector Dropdown */}
             <div className="relative">
               <button onClick={() => setShowModels(!showModels)} className="flex items-center gap-2 px-3 py-1.5 rounded-xl hover:bg-gray-50 transition group">
                 <span className="font-semibold text-[15px] group-hover:text-cortex-purple transition">{selectedModel.name}</span>
@@ -376,19 +439,18 @@ export default function ChatApp() {
             <button onClick={exportChat} className="flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 text-sm font-semibold hover:bg-gray-50 transition hidden sm:flex">
               <Download size={14}/> Export
             </button>
-            <button className="bg-gradient-to-r from-gray-900 to-black text-white px-5 py-2 rounded-xl text-sm font-medium hover:scale-105 transition-all shadow-md">Upgrade</button>
           </div>
         </header>
 
         <div className="flex-1 flex flex-col relative h-[calc(100%-4rem)] bg-[#fcfcfd]">
-          <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 md:px-8 py-8 custom-scrollbar pb-40">
+          <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto px-4 md:px-8 py-8 custom-scrollbar pb-40">
             {messages.length === 0 ? (
               <div className="max-w-2xl mx-auto flex flex-col items-center mt-10 md:mt-20 text-center">
                 <div className="cortex-orb mb-10 animate-[pulse_4s_ease-in-out_infinite] shadow-2xl" />
                 <h1 className="text-4xl md:text-5xl font-semibold tracking-tight mb-8 bg-gradient-to-br from-gray-900 to-gray-600 bg-clip-text text-transparent">How can I help you?</h1>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full max-w-3xl mt-8">
                   {[{i:<ImageIcon/>,t:"Generate Image",d:"A cyberpunk city at night", m:"image"}, {i:<Lightbulb/>,t:"Write Code",d:"Create a React login form", m:"text"}, {i:<Globe/>,t:"Web Search",d:"Latest AI news today", m:"text", w:true}].map((c,i)=>(
-                    <motion.div whileHover={{ y: -5 }} key={i} onClick={()=>{ if(c.w) setWebSearchEnabled(true); send(c.m as "text" | "image", c.d); }} className="bg-white border border-gray-100 rounded-2xl p-5 text-left hover:border-cortex-purple hover:shadow-[0_8px_30px_rgb(168,127,251,0.12)] cursor-pointer transition-all duration-300 group">
+                    <motion.div whileHover={{ y: -5 }} key={i} onClick={()=>{ if(c.w) setWebSearchEnabled(true); send(c.m as any, c.d); }} className="bg-white border border-gray-100 rounded-2xl p-5 text-left hover:border-cortex-purple hover:shadow-[0_8px_30px_rgb(168,127,251,0.12)] cursor-pointer transition-all duration-300 group">
                       <div className="text-gray-400 mb-3 group-hover:text-cortex-purple transition bg-gray-50 w-10 h-10 rounded-full flex items-center justify-center group-hover:bg-cortex-purple/10">{c.i}</div>
                       <div className="font-bold text-[14px]">{c.t}</div>
                       <div className="text-[12px] text-gray-500 mt-1">{c.d}</div>
@@ -415,23 +477,25 @@ export default function ChatApp() {
                           </div>
                         ) : (
                           <>
+                            {/* Handle image rendering from Base64 or URLs cleanly */}
+                            {m.content.includes("[Attached Image:") && m.content.includes("data:image")}
                             {m.content==="" && m.role==="assistant" ? (
                               <div className="flex gap-1.5 py-2"><span className="w-2.5 h-2.5 bg-cortex-purple rounded-full animate-bounce"/><span className="w-2.5 h-2.5 bg-cortex-purple rounded-full animate-bounce [animation-delay:0.2s]"/><span className="w-2.5 h-2.5 bg-cortex-purple rounded-full animate-bounce [animation-delay:0.4s]"/></div>
                             ) : m.content.startsWith("![") ? (
                               <div className="mt-1"><img src={m.content.match(/\((.*?)\)/)?.[1]} alt="Generated" className="rounded-2xl w-full max-w-md shadow-lg border border-gray-100" /></div>
                             ) : (
-                              <div className="text-[15.5px] leading-relaxed [&>p]:mb-4 last:[&>p]:mb-0 [&>pre]:bg-[#1a1b26] [&>pre]:text-gray-100 [&>pre]:p-5 [&>pre]:rounded-2xl [&>pre]:overflow-x-auto [&>pre]:my-4 [&>pre]:shadow-inner [&>code]:bg-purple-50 [&>code]:text-cortex-purple [&>code]:px-1.5 [&>code]:py-0.5 [&>code]:rounded-md [&>code]:font-medium [&>ul]:list-disc [&>ul]:ml-6 [&>ul]:mb-4 [&>ol]:list-decimal [&>ol]:ml-6 [&>ol]:mb-4">
-                                <ReactMarkdown>{m.content}</ReactMarkdown>
+                              <div className="text-[15.5px] leading-relaxed [&>p]:mb-4 last:[&>p]:mb-0 [&>ul]:list-disc [&>ul]:ml-6 [&>ul]:mb-4 [&>ol]:list-decimal [&>ol]:ml-6 [&>ol]:mb-4 overflow-hidden">
+                                <ReactMarkdown components={renderers}>{m.content}</ReactMarkdown>
                               </div>
                             )}
 
                             {!loading && m.content !== "" && (
                               <div className={`absolute ${m.role === 'user' ? 'bottom-[-30px] right-2' : 'bottom-[-35px] left-0'} flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity`}>
                                 {m.role === "user" ? (
-                                  <button onClick={() => { setEditingMsgIndex(i); setEditMsgContent(m.content); }} className="p-1.5 text-gray-500 hover:text-cortex-purple rounded-lg bg-white border border-gray-100 shadow-sm transition"><Edit2 size={14}/></button>
+                                  <button onClick={() => { setEditingMsgIndex(i); setEditMsgContent(m.content.replace(/\[Attached Image:.*?\]\ndata:image\/[^\n]+\n\n\[User Request\]: /, '')); }} className="p-1.5 text-gray-500 hover:text-cortex-purple rounded-lg bg-white border border-gray-100 shadow-sm transition"><Edit2 size={14}/></button>
                                 ) : (
                                   <>
-                                    <button onClick={()=>handleCopy(m.content,i)} className="p-1.5 text-gray-500 hover:text-cortex-purple rounded-lg bg-white border border-gray-100 shadow-sm transition" title="Copy">{copied===i?<Check size={14} className="text-green-500"/>:<Copy size={14}/>}</button>
+                                    <button onClick={()=>handleCopy(m.content, i.toString())} className="p-1.5 text-gray-500 hover:text-cortex-purple rounded-lg bg-white border border-gray-100 shadow-sm transition" title="Copy">{copied===i.toString()?<Check size={14} className="text-green-500"/>:<Copy size={14}/>}</button>
                                     <button onClick={()=>regenerate(i)} className="p-1.5 text-gray-500 hover:text-cortex-purple rounded-lg bg-white border border-gray-100 shadow-sm transition" title="Regenerate"><RefreshCw size={14}/></button>
                                   </>
                                 )}
@@ -444,7 +508,6 @@ export default function ChatApp() {
                   ))}
                 </AnimatePresence>
                 
-                {/* Typing Indicator for Loading State */}
                 {loading && messages[messages.length-1]?.role==="user" && (
                   <motion.div initial={{opacity:0, y:10}} animate={{opacity:1, y:0}} className="flex justify-start items-center gap-4">
                     <div className="w-9 h-9 rounded-full bg-gradient-to-br from-cortex-purple to-purple-500 flex items-center justify-center shrink-0 shadow-md"><Sparkles size={16} className="text-white"/></div>
@@ -457,23 +520,45 @@ export default function ChatApp() {
             )}
           </div>
 
-          {/* Premium Input Bar with File Preview & Animated Glow */}
+          {/* Floating Action Buttons */}
+          <div className="absolute bottom-32 left-1/2 -translate-x-1/2 flex items-center gap-3 z-30">
+            <AnimatePresence>
+              {showScrollButton && (
+                <motion.button initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} onClick={scrollToBottom} className="w-10 h-10 bg-white border border-gray-200 rounded-full shadow-lg flex items-center justify-center text-gray-600 hover:text-cortex-purple hover:border-cortex-purple transition">
+                  <ArrowDown size={18}/>
+                </motion.button>
+              )}
+            </AnimatePresence>
+            {messages.length > 0 && !loading && (
+              <motion.button initial={{ opacity: 0 }} animate={{ opacity: 1 }} onClick={clearContext} className="w-10 h-10 bg-white border border-gray-200 rounded-full shadow-lg flex items-center justify-center text-gray-600 hover:text-red-500 transition" title="Clear Memory">
+                <Eraser size={18}/>
+              </motion.button>
+            )}
+          </div>
+
+          {/* Premium Input Bar with Image/File Preview & Animated Glow */}
           <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-full max-w-3xl px-4 z-20">
             <motion.div layout className={`bg-white border shadow-[0_8px_30px_rgb(0,0,0,0.08)] rounded-[2rem] p-2 flex flex-col gap-2 backdrop-blur-2xl bg-white/90 transition-all duration-500 ${loading ? 'border-cortex-purple/50 shadow-[0_0_30px_rgb(168,127,251,0.2)]' : 'border-gray-200 hover:border-gray-300 focus-within:border-cortex-purple/40 focus-within:ring-4 focus-within:ring-cortex-purple/10'}`}>
               
-              {/* File Attachment Pill UI */}
+              {/* Ultra Premium Attachment UI */}
               <AnimatePresence>
                 {attachedFile && (
                   <motion.div initial={{ opacity: 0, height: 0, scale: 0.9 }} animate={{ opacity: 1, height: 'auto', scale: 1 }} exit={{ opacity: 0, height: 0, scale: 0.9 }} className="px-3 pt-2">
-                    <div className="flex items-center justify-between bg-purple-50 border border-purple-100 rounded-xl p-3 w-max max-w-xs shadow-sm">
-                      <div className="flex items-center gap-3 overflow-hidden">
-                        <div className="bg-white p-2 rounded-lg text-cortex-purple shadow-sm"><FileText size={18}/></div>
-                        <div className="flex flex-col truncate">
-                          <span className="text-xs font-bold text-gray-800 truncate">{attachedFile.name}</span>
-                          <span className="text-[10px] text-gray-500">Document ready</span>
+                    <div className="relative inline-flex items-center gap-3 bg-white border border-gray-200 rounded-xl p-2 w-max shadow-sm">
+                      {attachedFile.isImage ? (
+                        <div className="w-12 h-12 rounded-lg overflow-hidden border border-gray-100 shrink-0">
+                          <img src={attachedFile.content} alt="Preview" className="w-full h-full object-cover" />
                         </div>
+                      ) : (
+                        <div className="w-12 h-12 bg-purple-50 rounded-lg text-cortex-purple shadow-sm flex items-center justify-center shrink-0">
+                          <FileText size={20}/>
+                        </div>
+                      )}
+                      <div className="flex flex-col pr-8 max-w-[200px]">
+                        <span className="text-xs font-bold text-gray-800 truncate">{attachedFile.name}</span>
+                        <span className="text-[10px] text-green-600 font-medium">Ready to send</span>
                       </div>
-                      <button onClick={() => setAttachedFile(null)} className="ml-4 p-1.5 text-gray-400 hover:text-red-500 hover:bg-white rounded-lg transition"><X size={14}/></button>
+                      <button onClick={() => setAttachedFile(null)} className="absolute top-1 right-1 p-1 bg-white border shadow-sm text-gray-400 hover:text-red-500 rounded-full transition"><X size={12}/></button>
                     </div>
                   </motion.div>
                 )}
@@ -483,13 +568,13 @@ export default function ChatApp() {
                 <div className="flex flex-col flex-1 bg-gray-50/50 rounded-3xl px-4 py-2 border border-transparent transition-all duration-300">
                   <textarea 
                     ref={inputRef} value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}}} 
-                    placeholder="Ask Cortex anything..." className="w-full bg-transparent resize-none outline-none text-[15.5px] min-h-[44px] max-h-40 py-2.5 custom-scrollbar text-gray-800 placeholder:text-gray-400 font-medium" 
+                    placeholder="Message Cortex..." className="w-full bg-transparent resize-none outline-none text-[15.5px] min-h-[44px] max-h-40 py-2.5 custom-scrollbar text-gray-800 placeholder:text-gray-400 font-medium" 
                   />
                   <div className="flex items-center gap-2 mt-1 pb-1">
                     <button onClick={handleVoice} className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:text-cortex-purple hover:bg-purple-50 transition" title="Voice Input"><Mic size={18}/></button>
                     <button onClick={()=>send("image")} className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:text-cortex-purple hover:bg-purple-50 transition" title="Generate Image"><ImageIcon size={18}/></button>
-                    <label htmlFor="fileup" className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:text-cortex-purple hover:bg-purple-50 transition cursor-pointer" title="Attach File"><Paperclip size={18}/></label>
-                    <input type="file" id="fileup" className="hidden" accept=".txt,.md,.csv" onChange={handleFile} />
+                    <label htmlFor="fileup" className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:text-cortex-purple hover:bg-purple-50 transition cursor-pointer" title="Attach File/Image"><Paperclip size={18}/></label>
+                    <input type="file" id="fileup" className="hidden" accept=".txt,.md,.csv,.png,.jpg,.jpeg" onChange={handleFile} />
                     
                     <div className="w-px h-4 bg-gray-200 mx-1"></div>
                     <button onClick={()=>setWebSearchEnabled(!webSearchEnabled)} className={`px-3 h-8 flex items-center gap-1.5 text-xs font-bold rounded-full transition ${webSearchEnabled ? 'text-blue-600 bg-blue-50 border border-blue-100' : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100 border border-transparent'}`} title="Toggle Web Search">
