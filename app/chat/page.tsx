@@ -6,7 +6,7 @@ import {
   Plus, Search, Download, Settings, Mic, Paperclip, Send, Loader2, Image as ImageIcon, 
   Lightbulb, Sparkles, LogOut, PanelLeftClose, PanelLeft, Copy, Check, RefreshCw, StopCircle, 
   ChevronDown, Globe, FileText, AlertCircle, ArrowDown, Eraser, AlignLeft, X,
-  Star, Wand2, Share2, Database
+  Star, Wand2, Share2, Database, ThumbsUp, ThumbsDown, MoreHorizontal, Mail, Code, AlertTriangle, Volume2
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
@@ -46,6 +46,10 @@ export default function ChatApp() {
   
   const [toast, setToast] = useState< Toast >(null);
   const [attachedFile, setAttachedFile] = useState< AttachedFile >(null);
+
+  // NEW: Advanced Action States
+  const [ratings, setRatings] = useState<{[key: number]: 'up'|'down'}>({});
+  const [openMenu, setOpenMenu] = useState<number | null>(null);
   
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -58,6 +62,13 @@ export default function ChatApp() {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3000);
   };
+
+  // Close menus when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => setOpenMenu(null);
+    window.addEventListener('click', handleClickOutside);
+    return () => window.removeEventListener('click', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     const t = getToken();
@@ -78,16 +89,17 @@ export default function ChatApp() {
 
   useEffect(() => {
     if (activeId) {
-      fetch(`/api/chat/${activeId}`).then(r => r.json()).then(d => setMessages(d.messages || []));
+      fetch(`/api/chat/${activeId}`).then(r => r.json()).then(d => {
+        setMessages(d.messages || []);
+        setRatings({}); // Reset ratings on chat change
+      });
     } else {
       setMessages([]);
     }
   }, [activeId]);
 
   const scrollToBottom = () => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-    }
+    if (scrollRef.current) scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   };
 
   useEffect(() => { scrollToBottom(); }, [messages, loading]);
@@ -107,6 +119,49 @@ export default function ChatApp() {
   };
 
   useEffect(() => { autoResizeInput(); }, [input]);
+
+  // --- NEW ADVANCED ACTION HANDLERS ---
+
+  const handleRate = (index: number, type: 'up'|'down') => {
+    setRatings(prev => ({ ...prev, [index]: prev[index] === type ? undefined : type } as any));
+    showToast(type === 'up' ? "Feedback recorded: Positive" : "Feedback recorded: Negative");
+  };
+
+  const exportToDocs = (content: string, index: number) => {
+    const blob = new Blob([content], { type: 'application/msword' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `Cortex_Response_${index}.doc`; a.click();
+    URL.revokeObjectURL(url);
+    showToast("Exported to Docs");
+  };
+
+  const draftGmail = (content: string) => {
+    const url = `https://mail.google.com/mail/?view=cm&fs=1&su=Cortex AI Output&body=${encodeURIComponent(content)}`;
+    window.open(url, '_blank');
+    showToast("Drafting in Gmail...");
+  };
+
+  const sendToAdmin = (content: string) => {
+    const url = `mailto:a70064182@gmail.com?subject=Shared Cortex AI Response&body=${encodeURIComponent(content)}`;
+    window.open(url, '_self');
+    showToast("Opening Email Client...");
+  };
+
+  const reportLegal = () => {
+    const url = `mailto:a70064182@gmail.com?subject=Legal / Safety Issue Report&body=Please describe the issue below:%0D%0A%0D%0A`;
+    window.open(url, '_self');
+  };
+
+  const exportToReplit = (content: string) => {
+    // Extract code block content if possible, otherwise copy whole text
+    const codeMatch = content.match(/```[\s\S]*?\n([\s\S]*?)```/);
+    const codeToCopy = codeMatch ? codeMatch[1] : content;
+    navigator.clipboard.writeText(codeToCopy);
+    showToast("Code copied! Opening Replit...");
+    setTimeout(() => window.open('https://replit.com/~', '_blank'), 1500);
+  };
+
+  // --- EXISTING HANDLERS ---
 
   const newChat = () => { setActiveId(null); setMessages([]); setView("chat"); setAttachedFile(null); if (window.innerWidth < 768) setSidebarOpen(false); };
 
@@ -328,7 +383,6 @@ export default function ChatApp() {
 
       {sidebarOpen && <div className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm transition-all" onClick={() => setSidebarOpen(false)} />}
 
-      {/* MOBILE RESPONSIVE SIDEBAR */}
       <AnimatePresence>
         {(sidebarOpen) && (
           <motion.aside layout initial={{ x: -300 }} animate={{ x: 0 }} exit={{ x: -300 }} transition={{ type: "spring", bounce: 0, duration: 0.4 }} 
@@ -375,7 +429,6 @@ export default function ChatApp() {
               ))}
             </div>
 
-            {/* NEW Context Memory UI Indicator */}
             <div className="px-5 pt-4 pb-2">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1.5"><Database size={12}/> Context Used</span>
@@ -428,7 +481,7 @@ export default function ChatApp() {
         </header>
 
         <div className="flex-1 flex flex-col relative bg-transparent overflow-hidden">
-          <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto px-4 md:px-8 pt-6 pb-[200px] md:pb-40 custom-scrollbar w-full">
+          <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto px-4 md:px-8 pt-6 pb-[200px] md:pb-40 custom-scrollbar w-full relative z-0">
             {messages.length === 0 ? (
               <div className="max-w-2xl mx-auto flex flex-col items-center mt-8 md:mt-20 text-center w-full">
                 <div className="w-32 h-32 md:w-48 md:h-48 mb-6 md:mb-8 relative flex items-center justify-center mix-blend-screen pointer-events-none">
@@ -448,12 +501,12 @@ export default function ChatApp() {
                 </div>
               </div>
             ) : (
-              <div className="max-w-3xl mx-auto space-y-6 md:space-y-8 w-full">
+              <div className="max-w-3xl mx-auto space-y-12 md:space-y-14 w-full pb-8">
                 {messages.map((m, i) => (
-                  <motion.div initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} key={i} className={`flex ${m.role==="user"?"justify-end":"justify-start"} group w-full`}>
+                  <motion.div initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} key={i} className={`flex ${m.role==="user"?"justify-end":"justify-start"} group w-full relative`}>
                     {m.role==="assistant" && <div className="hidden md:flex w-8 h-8 rounded-full bg-gradient-to-br from-[#1a1a1e] to-[#2a2a35] border border-white/10 items-center justify-center shrink-0 mr-3 mt-1"><Sparkles size={14} className="text-cortex-purple"/></div>}
                     
-                    <div className={`relative max-w-[90%] md:max-w-[85%] ${m.role==="user" ? "bg-[#1e1e24] text-white rounded-[1.5rem] rounded-tr-sm px-5 py-3 border border-white/5 shadow-md break-words" : "bg-transparent text-gray-200 w-full rounded-3xl py-1 overflow-hidden"}`}>
+                    <div className={`relative max-w-[90%] md:max-w-[85%] ${m.role==="user" ? "bg-[#1e1e24] text-white rounded-[1.5rem] rounded-tr-sm px-5 py-3 border border-white/5 shadow-md break-words" : "bg-transparent text-gray-200 w-full rounded-3xl py-1 overflow-visible"}`}>
                       
                       {m.content.includes("[Attached Image:") && m.content.includes("data:image")}
                       {m.content==="" && m.role==="assistant" ? (
@@ -466,14 +519,52 @@ export default function ChatApp() {
                         </div>
                       )}
 
-                      {/* NEW: Action Menu for Messages (Share Button added) */}
+                      {/* --- ADVANCED AI MESSAGE ACTION BAR --- */}
                       {!loading && m.content !== "" && m.role === "assistant" && (
-                        <div className="flex items-center gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={()=>handleCopy(m.content, i.toString())} className="p-1.5 text-gray-500 hover:text-white rounded-lg bg-[#121214] border border-white/10 shadow-sm transition" title="Copy">{copied===i.toString()?<Check size={14} className="text-green-500"/>:<Copy size={14}/>}</button>
-                          <button onClick={()=>regenerate(i)} className="p-1.5 text-gray-500 hover:text-white rounded-lg bg-[#121214] border border-white/10 shadow-sm transition" title="Regenerate"><RefreshCw size={14}/></button>
-                          <button onClick={()=>handleCopy(m.content, `share-${i}`)} className="p-1.5 text-gray-500 hover:text-white rounded-lg bg-[#121214] border border-white/10 shadow-sm transition" title="Share Response"><Share2 size={14}/></button>
+                        <div className={`absolute bottom-[-40px] left-0 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-10`}>
+                          
+                          <button onClick={()=>handleRate(i, 'up')} className={`p-1.5 rounded-lg border shadow-sm transition ${ratings[i] === 'up' ? 'bg-cortex-purple/20 text-cortex-purple border-cortex-purple/30' : 'bg-[#121214] border-white/10 text-gray-500 hover:text-white hover:bg-white/5'}`} title="Like"><ThumbsUp size={14}/></button>
+                          
+                          <button onClick={()=>handleRate(i, 'down')} className={`p-1.5 rounded-lg border shadow-sm transition ${ratings[i] === 'down' ? 'bg-red-500/20 text-red-500 border-red-500/30' : 'bg-[#121214] border-white/10 text-gray-500 hover:text-white hover:bg-white/5'}`} title="Dislike"><ThumbsDown size={14}/></button>
+                          
+                          <button onClick={()=>handleCopy(m.content, i.toString())} className="p-1.5 text-gray-500 hover:text-white rounded-lg bg-[#121214] border border-white/10 shadow-sm transition hover:bg-white/5" title="Copy">{copied===i.toString()?<Check size={14} className="text-green-500"/>:<Copy size={14}/>}</button>
+                          
+                          <button onClick={()=>regenerate(i)} className="p-1.5 text-gray-500 hover:text-white rounded-lg bg-[#121214] border border-white/10 shadow-sm transition hover:bg-white/5" title="Redo"><RefreshCw size={14}/></button>
+                          
+                          {/* THREE DOT MENU */}
+                          <div className="relative">
+                            <button onClick={(e)=>{ e.stopPropagation(); setOpenMenu(openMenu === i ? null : i); }} className={`p-1.5 rounded-lg border shadow-sm transition ${openMenu === i ? 'bg-white/10 text-white border-white/20' : 'bg-[#121214] border-white/10 text-gray-500 hover:text-white hover:bg-white/5'}`} title="More options"><MoreHorizontal size={14}/></button>
+                            
+                            <AnimatePresence>
+                              {openMenu === i && (
+                                 <motion.div initial={{opacity:0, y:5, scale:0.95}} animate={{opacity:1, y:0, scale:1}} exit={{opacity:0, y:5, scale:0.95}} className="absolute bottom-full left-0 mb-2 w-56 bg-[#121214]/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.5)] overflow-hidden py-1.5 z-50">
+                                    <button onClick={() => { speak(m.content); setOpenMenu(null); }} className="w-full text-left px-3 py-2.5 text-xs font-medium text-gray-300 hover:bg-white/5 hover:text-white flex items-center gap-2.5"><Volume2 size={14}/> Read Aloud</button>
+                                    <button onClick={() => { exportToDocs(m.content, i); setOpenMenu(null); }} className="w-full text-left px-3 py-2.5 text-xs font-medium text-gray-300 hover:bg-white/5 hover:text-white flex items-center gap-2.5"><FileText size={14}/> Export to Docs</button>
+                                    <button onClick={() => { draftGmail(m.content); setOpenMenu(null); }} className="w-full text-left px-3 py-2.5 text-xs font-medium text-gray-300 hover:bg-white/5 hover:text-white flex items-center gap-2.5"><Mail size={14}/> Draft in Gmail</button>
+                                    
+                                    {/* Conditional Replit Export if code exists */}
+                                    {m.content.includes('```') && (
+                                      <button onClick={() => { exportToReplit(m.content); setOpenMenu(null); }} className="w-full text-left px-3 py-2.5 text-xs font-medium text-blue-400 hover:bg-blue-500/10 flex items-center gap-2.5"><Code size={14}/> Export to Replit</button>
+                                    )}
+                                    
+                                    <div className="h-px bg-white/5 my-1 w-full"></div>
+                                    
+                                    <button onClick={() => { sendToAdmin(m.content); setOpenMenu(null); }} className="w-full text-left px-3 py-2.5 text-xs font-medium text-gray-300 hover:bg-white/5 hover:text-white flex items-center gap-2.5"><Send size={14}/> Send to Author</button>
+                                    <button onClick={() => { reportLegal(); setOpenMenu(null); }} className="w-full text-left px-3 py-2.5 text-xs font-medium text-red-400 hover:bg-red-500/10 hover:text-red-300 flex items-center gap-2.5"><AlertTriangle size={14}/> Report Legal Issue</button>
+                                 </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </div>
                         </div>
                       )}
+
+                      {/* User Message Action Bar */}
+                      {!loading && m.role === "user" && (
+                        <div className={`absolute bottom-[-30px] right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10`}>
+                           <button onClick={() => { setEditingMsgIndex(i); setEditMsgContent(m.content.replace(/\[Attached Image:.*?\]\ndata:image\/[^\n]+\n\n\[User Request\]: /, '')); }} className="p-1.5 text-gray-500 hover:text-white rounded-lg bg-[#121214] border border-white/10 shadow-sm transition"><Edit2 size={12}/></button>
+                        </div>
+                      )}
+
                     </div>
                   </motion.div>
                 ))}
@@ -505,7 +596,6 @@ export default function ChatApp() {
             )}
           </div>
 
-          {/* MOBILE RESPONSIVE INPUT BAR */}
           <div className="absolute bottom-0 md:bottom-6 left-0 md:left-1/2 md:-translate-x-1/2 w-full md:max-w-3xl px-2 md:px-4 pb-4 pt-2 md:py-0 z-40 bg-gradient-to-t from-[#0a0a0c] via-[#0a0a0c]/90 to-transparent md:bg-none">
             <div className={`bg-[#121214]/90 md:bg-[#0f0f13] border shadow-2xl rounded-[1.5rem] md:rounded-[2rem] p-1.5 md:p-2 flex flex-col gap-2 backdrop-blur-3xl transition-all duration-300 w-full ${loading ? 'border-cortex-purple/50' : 'border-white/10 focus-within:border-cortex-purple/50'}`}>
               
@@ -534,7 +624,6 @@ export default function ChatApp() {
                   />
                   <div className="flex items-center gap-1 md:gap-2 mt-1 pb-1 overflow-x-auto custom-scrollbar">
                     
-                    {/* NEW: Prompt Enhancer Wand */}
                     <button onClick={enhancePrompt} className="p-1.5 md:w-8 md:h-8 flex items-center justify-center rounded-full text-cortex-purple hover:bg-cortex-purple/10 shrink-0 transition" title="Enhance Prompt"><Wand2 size={16}/></button>
                     <div className="w-px h-4 bg-white/10 mx-0.5 md:mx-1 shrink-0"></div>
 
