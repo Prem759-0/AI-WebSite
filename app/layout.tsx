@@ -11,7 +11,7 @@ const inter = Inter({
 export const metadata = {
   title: "Cortex AI | Advanced Intelligence",
   description: "Next-generation AI assistant powered by advanced models.",
-  themeColor: "#fcfcfd",
+  themeColor: "#050505",
 };
 
 export default function RootLayout({
@@ -21,7 +21,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={`${inter.className} bg-[#fcfcfd] text-gray-900 overflow-hidden`}>
+      {/* Removed 'overflow-hidden' from the body tag so the landing page can scroll.
+        Updated global background to #050505 (Deep Black) to match the dark UI. 
+      */}
+      <body className={`${inter.className} bg-[#050505] text-white antialiased`}>
         {children}
       </body>
     </html>
