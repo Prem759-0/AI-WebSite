@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 :root {
-  --background: #000000; /* Pure black background for the video effect */
+  --background: #000000;
   --foreground: #ffffff;
 }
 
@@ -35,56 +35,15 @@ body {
   background: rgba(255, 255, 255, 0.2);
 }
 
-/* --- THE NEW FLUID VIDEO ORB --- */
-.cortex-orb {
-  width: 100px;
-  height: 100px;
-  border-radius: 50%;
-  position: relative;
-  background: #000000;
-  /* Outer glass sphere reflection and glow */
-  box-shadow: 
-    0 0 30px rgba(123, 66, 246, 0.4),
-    inset 0 0 20px rgba(168, 127, 251, 0.8),
-    inset 0 0 10px rgba(0, 240, 255, 0.4);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  z-index: 10;
+/* Landing Page Grid Pattern */
+.bg-grid-pattern {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+  background-size: 32px 32px;
 }
 
-/* The glowing purple/blue ring outline */
-.cortex-orb::before {
-  content: '';
-  position: absolute;
-  inset: -2px;
-  border-radius: 50%;
-  background: linear-gradient(180deg, #7b42f6, #00f0ff);
-  z-index: -1;
-  filter: blur(4px);
-  animation: spin 4s linear infinite;
-}
-
-/* The inner morphing, fluid white/blue wave (matches the video) */
-.cortex-orb::after {
-  content: '';
-  position: absolute;
-  width: 65%;
-  height: 65%;
-  background: radial-gradient(circle at center, #ffffff 0%, #a87ffb 50%, #00f0ff 90%, transparent 100%);
-  /* Creates the organic, fluid shape */
-  border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%;
-  animation: morph 3s ease-in-out infinite alternate, spin 6s linear infinite;
-  filter: blur(3px) drop-shadow(0 0 15px #ffffff);
-  opacity: 0.95;
-}
-
-@keyframes morph {
-  0% { border-radius: 40% 60% 70% 30% / 40% 40% 60% 50%; transform: scale(1); }
-  100% { border-radius: 58% 42% 40% 60% / 50% 60% 40% 50%; transform: scale(1.15); }
-}
-
-@keyframes spin {
-  100% { transform: rotate(360deg); }
-}
+/* Basic Syntax Colors for Code Editor Feel */
+.token.keyword { color: #ff7b72; }
+.token.function { color: #82aaff; }
+.token.string { color: #c3e88d; }
+.token.comment { color: #7a88cf; font-style: italic; }
+.token.number { color: #f78c6c; }
