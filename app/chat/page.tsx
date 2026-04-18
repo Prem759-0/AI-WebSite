@@ -6,7 +6,7 @@ import {
   Plus, Search, Download, Settings, Mic, Paperclip, Send, Loader2, Image as ImageIcon, 
   Lightbulb, Sparkles, LogOut, PanelLeftClose, PanelLeft, Copy, Check, RefreshCw, StopCircle, 
   ChevronDown, Globe, FileText, AlertCircle, ArrowDown, Eraser, AlignLeft, X,
-  Star, Wand2, Share2, Database, ThumbsUp, ThumbsDown, MoreHorizontal, Mail, Code, AlertTriangle, Volume2
+  Star, Wand2, Share2, Database, ThumbsUp, ThumbsDown, MoreHorizontal, Mail, Code, AlertTriangle, Volume2, Edit2, Trash2
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
@@ -47,7 +47,7 @@ export default function ChatApp() {
   const [toast, setToast] = useState< Toast >(null);
   const [attachedFile, setAttachedFile] = useState< AttachedFile >(null);
 
-  // NEW: Advanced Action States
+  // Advanced Action States
   const [ratings, setRatings] = useState<{[key: number]: 'up'|'down'}>({});
   const [openMenu, setOpenMenu] = useState<number | null>(null);
   
@@ -63,7 +63,6 @@ export default function ChatApp() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  // Close menus when clicking outside
   useEffect(() => {
     const handleClickOutside = () => setOpenMenu(null);
     window.addEventListener('click', handleClickOutside);
@@ -91,7 +90,7 @@ export default function ChatApp() {
     if (activeId) {
       fetch(`/api/chat/${activeId}`).then(r => r.json()).then(d => {
         setMessages(d.messages || []);
-        setRatings({}); // Reset ratings on chat change
+        setRatings({});
       });
     } else {
       setMessages([]);
@@ -119,8 +118,6 @@ export default function ChatApp() {
   };
 
   useEffect(() => { autoResizeInput(); }, [input]);
-
-  // --- NEW ADVANCED ACTION HANDLERS ---
 
   const handleRate = (index: number, type: 'up'|'down') => {
     setRatings(prev => ({ ...prev, [index]: prev[index] === type ? undefined : type } as any));
@@ -153,15 +150,12 @@ export default function ChatApp() {
   };
 
   const exportToReplit = (content: string) => {
-    // Extract code block content if possible, otherwise copy whole text
     const codeMatch = content.match(/```[\s\S]*?\n([\s\S]*?)```/);
     const codeToCopy = codeMatch ? codeMatch[1] : content;
     navigator.clipboard.writeText(codeToCopy);
     showToast("Code copied! Opening Replit...");
     setTimeout(() => window.open('https://replit.com/~', '_blank'), 1500);
   };
-
-  // --- EXISTING HANDLERS ---
 
   const newChat = () => { setActiveId(null); setMessages([]); setView("chat"); setAttachedFile(null); if (window.innerWidth < 768) setSidebarOpen(false); };
 
@@ -341,7 +335,6 @@ export default function ChatApp() {
 
   const filteredChats = chats.filter(c => c.title.toLowerCase().includes(search.toLowerCase()));
 
-  // Safe compiler renderers
   const renderers = {
     code: (props: any) => {
       const { node, inline, className, children, ...rest } = props;
@@ -519,7 +512,6 @@ export default function ChatApp() {
                         </div>
                       )}
 
-                      {/* --- ADVANCED AI MESSAGE ACTION BAR --- */}
                       {!loading && m.content !== "" && m.role === "assistant" && (
                         <div className={`absolute bottom-[-40px] left-0 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-10`}>
                           
@@ -531,7 +523,6 @@ export default function ChatApp() {
                           
                           <button onClick={()=>regenerate(i)} className="p-1.5 text-gray-500 hover:text-white rounded-lg bg-[#121214] border border-white/10 shadow-sm transition hover:bg-white/5" title="Redo"><RefreshCw size={14}/></button>
                           
-                          {/* THREE DOT MENU */}
                           <div className="relative">
                             <button onClick={(e)=>{ e.stopPropagation(); setOpenMenu(openMenu === i ? null : i); }} className={`p-1.5 rounded-lg border shadow-sm transition ${openMenu === i ? 'bg-white/10 text-white border-white/20' : 'bg-[#121214] border-white/10 text-gray-500 hover:text-white hover:bg-white/5'}`} title="More options"><MoreHorizontal size={14}/></button>
                             
@@ -542,7 +533,6 @@ export default function ChatApp() {
                                     <button onClick={() => { exportToDocs(m.content, i); setOpenMenu(null); }} className="w-full text-left px-3 py-2.5 text-xs font-medium text-gray-300 hover:bg-white/5 hover:text-white flex items-center gap-2.5"><FileText size={14}/> Export to Docs</button>
                                     <button onClick={() => { draftGmail(m.content); setOpenMenu(null); }} className="w-full text-left px-3 py-2.5 text-xs font-medium text-gray-300 hover:bg-white/5 hover:text-white flex items-center gap-2.5"><Mail size={14}/> Draft in Gmail</button>
                                     
-                                    {/* Conditional Replit Export if code exists */}
                                     {m.content.includes('```') && (
                                       <button onClick={() => { exportToReplit(m.content); setOpenMenu(null); }} className="w-full text-left px-3 py-2.5 text-xs font-medium text-blue-400 hover:bg-blue-500/10 flex items-center gap-2.5"><Code size={14}/> Export to Replit</button>
                                     )}
@@ -558,7 +548,6 @@ export default function ChatApp() {
                         </div>
                       )}
 
-                      {/* User Message Action Bar */}
                       {!loading && m.role === "user" && (
                         <div className={`absolute bottom-[-30px] right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10`}>
                            <button onClick={() => { setEditingMsgIndex(i); setEditMsgContent(m.content.replace(/\[Attached Image:.*?\]\ndata:image\/[^\n]+\n\n\[User Request\]: /, '')); }} className="p-1.5 text-gray-500 hover:text-white rounded-lg bg-[#121214] border border-white/10 shadow-sm transition"><Edit2 size={12}/></button>
