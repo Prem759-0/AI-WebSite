@@ -5,13 +5,16 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   Plus, Search, Download, Settings, Mic, Paperclip, Send, Loader2, Image as ImageIcon, 
   Lightbulb, Sparkles, LogOut, PanelLeftClose, PanelLeft, Copy, Check, RefreshCw, StopCircle, 
-  ChevronDown, Globe, FileText, AlertCircle, ArrowDown, Eraser, AlignLeft, X
+  ChevronDown, Globe, FileText, AlertCircle, ArrowDown, Eraser, AlignLeft, X,
+  Star, Wand2, Share2, Database
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
+// Safe Type Definitions
 type Message = { role: "user" | "assistant", content: string };
-type ChatInfo = { _id: string, title: string, updatedAt: string };
+type ChatInfo = { _id: string, title: string, updatedAt: string, starred?: boolean };
 type Toast = { msg: string, type: "success" | "error" } | null;
+type ViewMode = "chat" | "settings" | "profile" | "explore";
 type AttachedFile = { name: string, content: string, isImage?: boolean } | null;
 
 const MODELS = [
@@ -21,21 +24,28 @@ const MODELS = [
 ];
 
 export default function ChatApp() {
-  const [chats, setChats] = useState<Array<ChatInfo>>([]);
-  const [activeId, setActiveId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<Array<Message>>([]);
+  const [chats, setChats] = useState< Array<ChatInfo> >([]);
+  const [activeId, setActiveId] = useState< string | null >(null);
+  const [messages, setMessages] = useState< Array<Message> >([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [user, setUser] = useState({ name: "User", email: "" });
-  const [copied, setCopied] = useState<string | null>(null);
+  const [copied, setCopied] = useState< string | null >(null);
   const [search, setSearch] = useState("");
+  const [view, setView] = useState< ViewMode >("chat");
   const [showScrollButton, setShowScrollButton] = useState(false);
+  
+  const [editingId, setEditingId] = useState< string | null >(null);
+  const [editTitle, setEditTitle] = useState("");
   const [selectedModel, setSelectedModel] = useState(MODELS[0]);
   const [showModels, setShowModels] = useState(false);
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
-  const [toast, setToast] = useState<Toast>(null);
-  const [attachedFile, setAttachedFile] = useState<AttachedFile>(null);
+  const [editingMsgIndex, setEditingMsgIndex] = useState< number | null >(null);
+  const [editMsgContent, setEditMsgContent] = useState("");
+  
+  const [toast, setToast] = useState< Toast >(null);
+  const [attachedFile, setAttachedFile] = useState< AttachedFile >(null);
   
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -75,7 +85,9 @@ export default function ChatApp() {
   }, [activeId]);
 
   const scrollToBottom = () => {
-    if (scrollRef.current) scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+    if (scrollRef.current) {
+      scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+    }
   };
 
   useEffect(() => { scrollToBottom(); }, [messages, loading]);
@@ -96,17 +108,53 @@ export default function ChatApp() {
 
   useEffect(() => { autoResizeInput(); }, [input]);
 
-  const newChat = () => { setActiveId(null); setMessages([]); setAttachedFile(null); if (window.innerWidth < 768) setSidebarOpen(false); };
-  
+  const newChat = () => { setActiveId(null); setMessages([]); setView("chat"); setAttachedFile(null); if (window.innerWidth < 768) setSidebarOpen(false); };
+
   const clearContext = () => {
     if (!confirm("Clear this conversation's memory?")) return;
-    setMessages([]); showToast("Chat memory cleared");
+    setMessages([]);
+    showToast("Chat memory cleared");
+  };
+
+  const toggleStar = (id: string) => {
+    setChats(chats.map(c => c._id === id ? { ...c, starred: !c.starred } : c));
+    showToast("Chat pinned");
+  };
+
+  const enhancePrompt = () => {
+    if (!input.trim()) return showToast("Type something to enhance first!", "error");
+    setInput(`Enhance this concept with high detail: ${input}`);
+    showToast("Prompt magic applied!");
+  };
+
+  const deleteChat = async (id: string) => {
+    if (!confirm("Delete this chat permanently?")) return;
+    try {
+      await fetch(`/api/chat/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${getToken()}` } });
+      setChats(chats.filter(c => c._id !== id));
+      if (activeId === id) newChat();
+      showToast("Chat deleted successfully");
+    } catch (e) { showToast("Failed to delete chat", "error"); }
+  };
+
+  const saveRename = async (id: string) => {
+    if (!editTitle.trim()) { setEditingId(null); return; }
+    try {
+      await fetch(`/api/chat/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${getToken()}` }, body: JSON.stringify({ title: editTitle }) });
+      setChats(chats.map(c => c._id === id ? { ...c, title: editTitle } : c));
+      setEditingId(null);
+      showToast("Chat renamed");
+    } catch (e) {}
   };
 
   const handleCopy = (text: string, id: string) => { 
-    navigator.clipboard.writeText(text); setCopied(id); showToast("Copied to clipboard");
+    navigator.clipboard.writeText(text); 
+    setCopied(id); 
+    showToast("Copied to clipboard");
     setTimeout(() => setCopied(null), 2000); 
   };
+  
+  const speak = (text: string) => { window.speechSynthesis.speak(new SpeechSynthesisUtterance(text.replace(/[*#`]/g, ""))); };
 
   const handleVoice = () => {
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -140,11 +188,37 @@ export default function ChatApp() {
     e.target.value = ''; 
   };
 
+  const exportChat = () => {
+    if (messages.length === 0) return showToast("No messages to export", "error");
+    const textContent = messages.map(m => `[${m.role.toUpperCase()}]\n${m.content}\n`).join('\n---\n\n');
+    const blob = new Blob([textContent], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `Cortex_Export_${new Date().toLocaleDateString().replace(/\//g, '-')}.txt`; a.click();
+    URL.revokeObjectURL(url);
+    showToast("Chat exported successfully");
+  };
+
   const stopGenerating = () => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort(); abortControllerRef.current = null;
       setLoading(false); showToast("Generation stopped");
     }
+  };
+
+  const regenerate = async (index: number) => {
+    const previousMessages = messages.slice(0, index);
+    const lastUserMsg = previousMessages[previousMessages.length - 1];
+    if (lastUserMsg) {
+      setMessages(previousMessages);
+      await send("text", lastUserMsg.content, previousMessages.slice(0, -1));
+    }
+  };
+
+  const saveEditedMessage = async () => {
+    if (editingMsgIndex === null || !editMsgContent.trim()) return;
+    const previousMessages = messages.slice(0, editingMsgIndex);
+    setEditingMsgIndex(null); setMessages(previousMessages);
+    await send("text", editMsgContent, previousMessages);
   };
 
   const send = async (mode: string = "text", forcedInput?: string, overrideMessages?: Message[]) => {
@@ -212,6 +286,7 @@ export default function ChatApp() {
 
   const filteredChats = chats.filter(c => c.title.toLowerCase().includes(search.toLowerCase()));
 
+  // Safe compiler renderers
   const renderers = {
     code: (props: any) => {
       const { node, inline, className, children, ...rest } = props;
@@ -272,14 +347,43 @@ export default function ChatApp() {
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-3 custom-scrollbar">
-              <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-3 px-2 mt-2">Recent</p>
+            <div className="flex-1 overflow-y-auto px-3 custom-scrollbar flex flex-col">
+              <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2 px-2 mt-2">Recent Chats</p>
               {filteredChats.map(c => (
-                <div onClick={() => {setActiveId(c._id); if(window.innerWidth<768) setSidebarOpen(false);}} key={c._id} 
-                  className={`flex items-center justify-between py-3 px-3 rounded-xl cursor-pointer mb-1 transition-all ${activeId === c._id ? "bg-[#1a1a1e] border border-white/5 text-white font-medium" : "text-gray-400 hover:bg-white/5 hover:text-white"}`}>
-                  <span className="truncate flex-1 text-[13.5px]">{c.title}</span>
+                <div key={c._id} className="relative group">
+                  {editingId === c._id ? (
+                    <div className="flex items-center gap-1 bg-[#1a1a1e] border border-cortex-purple shadow-sm rounded-xl p-1.5 mx-1 mb-1">
+                      <input autoFocus value={editTitle} onChange={e=>setEditTitle(e.target.value)} onKeyDown={e=>{if(e.key==='Enter') saveRename(c._id)}} className="flex-1 text-[13px] outline-none px-1 bg-transparent text-white" />
+                      <button onClick={()=>saveRename(c._id)} className="text-green-400 p-1 bg-green-400/10 rounded-md"><Check size={14}/></button>
+                      <button onClick={()=>{setEditingId(null); setEditTitle("");}} className="text-red-400 p-1 bg-red-400/10 rounded-md"><X size={14}/></button>
+                    </div>
+                  ) : (
+                    <div onClick={() => {setActiveId(c._id); if(window.innerWidth<768) setSidebarOpen(false);}} 
+                      className={`flex items-center justify-between py-2.5 px-3 rounded-xl cursor-pointer mb-1 transition-all ${activeId === c._id ? "bg-[#1a1a1e] border border-white/5 text-white font-medium" : "text-gray-400 hover:bg-white/5 hover:text-white"}`}>
+                      <div className="flex items-center gap-2 truncate flex-1 pr-2">
+                        {c.starred && <Star size={12} className="text-yellow-500 fill-yellow-500 shrink-0"/>}
+                        <span className="truncate text-[13.5px]">{c.title}</span>
+                      </div>
+                      <div className="hidden group-hover:flex items-center gap-1">
+                        <button onClick={(e)=>{e.stopPropagation(); toggleStar(c._id);}} className="text-gray-500 hover:text-yellow-500 p-1"><Star size={14}/></button>
+                        <button onClick={(e)=>{e.stopPropagation(); setEditingId(c._id); setEditTitle(c.title);}} className="text-gray-500 hover:text-cortex-purple p-1"><Edit2 size={14}/></button>
+                        <button onClick={(e)=>{e.stopPropagation(); deleteChat(c._id);}} className="text-gray-500 hover:text-red-500 p-1"><Trash2 size={14}/></button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
+            </div>
+
+            {/* NEW Context Memory UI Indicator */}
+            <div className="px-5 pt-4 pb-2">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1.5"><Database size={12}/> Context Used</span>
+                <span className="text-[10px] text-gray-400">{(messages.length * 1.5).toFixed(1)}k / 128k</span>
+              </div>
+              <div className="w-full bg-white/5 rounded-full h-1.5 mb-2 overflow-hidden">
+                <div className="bg-gradient-to-r from-cortex-purple to-blue-500 h-1.5 rounded-full" style={{ width: `${Math.min((messages.length / 50) * 100, 100)}%` }}></div>
+              </div>
             </div>
 
             <div className="p-4 border-t border-white/5 bg-[#09090b]">
@@ -288,7 +392,7 @@ export default function ChatApp() {
                   <div className="w-9 h-9 rounded-full bg-[#1a1a1e] flex items-center justify-center font-bold text-sm text-white border border-white/10">{user.name ? user.name[0].toUpperCase() : "U"}</div>
                   <div className="flex flex-col"><span className="text-sm font-bold text-gray-200">{user.name}</span><span className="text-[11px] text-gray-500 truncate w-24">{user.email}</span></div>
                 </div>
-                <button onClick={()=>{localStorage.clear(); router.push("/login");}} className="text-gray-500 hover:text-red-500 p-2 rounded-lg hover:bg-red-500/10"><LogOut size={16}/></button>
+                <button onClick={()=>{localStorage.clear(); router.push("/login");}} className="text-gray-500 hover:text-red-500 p-2 rounded-lg hover:bg-red-500/10" title="Logout"><LogOut size={16}/></button>
               </div>
             </div>
           </motion.aside>
@@ -361,6 +465,15 @@ export default function ChatApp() {
                           <ReactMarkdown components={renderers}>{m.content}</ReactMarkdown>
                         </div>
                       )}
+
+                      {/* NEW: Action Menu for Messages (Share Button added) */}
+                      {!loading && m.content !== "" && m.role === "assistant" && (
+                        <div className="flex items-center gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button onClick={()=>handleCopy(m.content, i.toString())} className="p-1.5 text-gray-500 hover:text-white rounded-lg bg-[#121214] border border-white/10 shadow-sm transition" title="Copy">{copied===i.toString()?<Check size={14} className="text-green-500"/>:<Copy size={14}/>}</button>
+                          <button onClick={()=>regenerate(i)} className="p-1.5 text-gray-500 hover:text-white rounded-lg bg-[#121214] border border-white/10 shadow-sm transition" title="Regenerate"><RefreshCw size={14}/></button>
+                          <button onClick={()=>handleCopy(m.content, `share-${i}`)} className="p-1.5 text-gray-500 hover:text-white rounded-lg bg-[#121214] border border-white/10 shadow-sm transition" title="Share Response"><Share2 size={14}/></button>
+                        </div>
+                      )}
                     </div>
                   </motion.div>
                 ))}
@@ -420,6 +533,11 @@ export default function ChatApp() {
                     className="w-full bg-transparent resize-none outline-none text-[15px] md:text-[15.5px] min-h-[40px] md:min-h-[44px] py-2 md:py-2.5 custom-scrollbar text-white placeholder:text-gray-500 leading-tight" 
                   />
                   <div className="flex items-center gap-1 md:gap-2 mt-1 pb-1 overflow-x-auto custom-scrollbar">
+                    
+                    {/* NEW: Prompt Enhancer Wand */}
+                    <button onClick={enhancePrompt} className="p-1.5 md:w-8 md:h-8 flex items-center justify-center rounded-full text-cortex-purple hover:bg-cortex-purple/10 shrink-0 transition" title="Enhance Prompt"><Wand2 size={16}/></button>
+                    <div className="w-px h-4 bg-white/10 mx-0.5 md:mx-1 shrink-0"></div>
+
                     <button onClick={handleVoice} className="p-1.5 md:w-8 md:h-8 flex items-center justify-center rounded-full text-gray-500 hover:text-white md:hover:bg-white/5 shrink-0"><Mic size={18}/></button>
                     <button onClick={()=>send("image")} className="p-1.5 md:w-8 md:h-8 flex items-center justify-center rounded-full text-gray-500 hover:text-white md:hover:bg-white/5 shrink-0"><ImageIcon size={18}/></button>
                     <label htmlFor="fileup" className="p-1.5 md:w-8 md:h-8 flex items-center justify-center rounded-full text-gray-500 hover:text-white md:hover:bg-white/5 cursor-pointer shrink-0"><Paperclip size={18}/></label>
