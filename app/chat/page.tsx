@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
+// Safe Type Definitions
 type Message = { role: "user" | "assistant", content: string };
 type ChatInfo = { _id: string, title: string, updatedAt: string };
 type Toast = { msg: string, type: "success" | "error" } | null;
@@ -23,28 +24,29 @@ const MODELS = [
 ];
 
 export default function ChatApp() {
-  const [chats, setChats] = useState<ChatInfo[]>([]);
-  const [activeId, setActiveId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
+  // Safe generic declarations for SWC Compiler
+  const [chats, setChats] = useState< Array<ChatInfo> >([]);
+  const [activeId, setActiveId] = useState< string | null >(null);
+  const [messages, setMessages] = useState< Array<Message> >([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [user, setUser] = useState({ name: "User", email: "" });
-  const [copied, setCopied] = useState<string | null>(null);
+  const [copied, setCopied] = useState< string | null >(null);
   const [search, setSearch] = useState("");
-  const [view, setView] = useState<ViewMode>("chat");
+  const [view, setView] = useState< ViewMode >("chat");
   const [showScrollButton, setShowScrollButton] = useState(false);
   
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState< string | null >(null);
   const [editTitle, setEditTitle] = useState("");
   const [selectedModel, setSelectedModel] = useState(MODELS[0]);
   const [showModels, setShowModels] = useState(false);
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
-  const [editingMsgIndex, setEditingMsgIndex] = useState<number | null>(null);
+  const [editingMsgIndex, setEditingMsgIndex] = useState< number | null >(null);
   const [editMsgContent, setEditMsgContent] = useState("");
   
-  const [toast, setToast] = useState<Toast>(null);
-  const [attachedFile, setAttachedFile] = useState<AttachedFile>(null);
+  const [toast, setToast] = useState< Toast >(null);
+  const [attachedFile, setAttachedFile] = useState< AttachedFile >(null);
   
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -208,7 +210,7 @@ export default function ChatApp() {
     await send("text", editMsgContent, previousMessages);
   };
 
-  const send = async (mode: "text" | "image" = "text", forcedInput?: string, overrideMessages?: Message[]) => {
+  const send = async (mode: string = "text", forcedInput?: string, overrideMessages?: Message[]) => {
     const txt = forcedInput || input;
     if ((!txt.trim() && !attachedFile) || loading) return;
     
@@ -271,33 +273,39 @@ export default function ChatApp() {
 
   const filteredChats = chats.filter(c => c.title.toLowerCase().includes(search.toLowerCase()));
 
+  // 100% Compiler-Safe Renderers using an arrow function directly
   const renderers = {
-    code({ node, inline, className, children, ...props }: any) {
+    code: (props: any) => {
+      const { node, inline, className, children, ...rest } = props;
       const match = /language-(\w+)/.exec(className || '');
       const codeString = String(children).replace(/\n$/, '');
       const codeId = Math.random().toString(36).substring(7);
 
-      return !inline && match ? (
-        <div className="relative my-5 rounded-2xl overflow-hidden bg-[#0d0d0f] border border-white/10 shadow-2xl group/code">
-          <div className="flex items-center justify-between px-4 py-2.5 bg-[#16161a] border-b border-white/5">
-            <div className="flex items-center gap-2">
-              <div className="flex gap-1.5 mr-2">
-                <div className="w-3 h-3 rounded-full bg-[#ff5f56]"></div>
-                <div className="w-3 h-3 rounded-full bg-[#ffbd2e]"></div>
-                <div className="w-3 h-3 rounded-full bg-[#27c93f]"></div>
+      if (!inline && match) {
+        return (
+          <div className="relative my-5 rounded-2xl overflow-hidden bg-[#0d0d0f] border border-white/10 shadow-2xl group/code">
+            <div className="flex items-center justify-between px-4 py-2.5 bg-[#16161a] border-b border-white/5">
+              <div className="flex items-center gap-2">
+                <div className="flex gap-1.5 mr-2">
+                  <div className="w-3 h-3 rounded-full bg-[#ff5f56]"></div>
+                  <div className="w-3 h-3 rounded-full bg-[#ffbd2e]"></div>
+                  <div className="w-3 h-3 rounded-full bg-[#27c93f]"></div>
+                </div>
+                <span className="text-gray-400 text-xs font-medium uppercase tracking-wider">{match[1]}</span>
               </div>
-              <span className="text-gray-400 text-xs font-medium uppercase tracking-wider">{match[1]}</span>
+              <button onClick={() => handleCopy(codeString, codeId)} className="text-gray-400 hover:text-white transition flex items-center gap-1.5 text-xs font-medium bg-white/5 hover:bg-white/10 px-2 py-1 rounded-md">
+                {copied === codeId ? <span className="flex items-center gap-1"><Check size={14} className="text-green-500"/> Copied</span> : <span className="flex items-center gap-1"><Copy size={14}/> Copy</span>}
+              </button>
             </div>
-            <button onClick={() => handleCopy(codeString, codeId)} className="text-gray-400 hover:text-white transition flex items-center gap-1.5 text-xs font-medium bg-white/5 hover:bg-white/10 px-2 py-1 rounded-md">
-              {copied === codeId ? <><Check size={14} className="text-green-500"/> Copied</> : <><Copy size={14}/> Copy</>}
-            </button>
+            <div className="p-5 overflow-x-auto">
+              <code className={`${className} text-gray-200 text-[14px] font-mono leading-relaxed`} {...rest}>{children}</code>
+            </div>
           </div>
-          <div className="p-5 overflow-x-auto">
-            <code className={`${className} text-gray-200 text-[14px] font-mono leading-relaxed`} {...props}>{children}</code>
-          </div>
-        </div>
-      ) : (
-        <code className="bg-cortex-purple/10 text-[#a87ffb] px-1.5 py-0.5 rounded-md font-mono text-[13.5px]" {...props}>{children}</code>
+        );
+      }
+
+      return (
+        <code className="bg-cortex-purple/10 text-[#a87ffb] px-1.5 py-0.5 rounded-md font-mono text-[13.5px]" {...rest}>{children}</code>
       );
     }
   };
@@ -445,7 +453,6 @@ export default function ChatApp() {
                           </div>
                         ) : (
                           <>
-                            {m.content.includes("[Attached Image:") && m.content.includes("data:image")}
                             {m.content==="" && m.role==="assistant" ? (
                               <div className="flex gap-1.5 py-2"><span className="w-2.5 h-2.5 bg-cortex-purple rounded-full animate-bounce"/><span className="w-2.5 h-2.5 bg-cortex-purple rounded-full animate-bounce [animation-delay:0.2s]"/><span className="w-2.5 h-2.5 bg-cortex-purple rounded-full animate-bounce [animation-delay:0.4s]"/></div>
                             ) : m.content.startsWith("![") ? (
@@ -511,4 +518,57 @@ export default function ChatApp() {
                     <div className="relative inline-flex items-center gap-3 bg-[#1a1a1e] border border-white/10 rounded-xl p-2 w-max shadow-sm">
                       {attachedFile.isImage ? (
                         <div className="w-12 h-12 rounded-lg overflow-hidden border border-white/5 shrink-0">
-                          <img src={
+                          <img src={attachedFile.content} alt="Preview" className="w-full h-full object-cover" />
+                        </div>
+                      ) : (
+                        <div className="w-12 h-12 bg-white/5 rounded-lg text-cortex-purple flex items-center justify-center shrink-0">
+                          <FileText size={20}/>
+                        </div>
+                      )}
+                      <div className="flex flex-col pr-8 max-w-[200px]">
+                        <span className="text-xs font-bold text-gray-200 truncate">{attachedFile.name}</span>
+                        <span className="text-[10px] text-cortex-purple font-medium">Ready to send</span>
+                      </div>
+                      <button onClick={() => setAttachedFile(null)} className="absolute top-1 right-1 p-1 bg-[#222] border border-white/10 text-gray-400 hover:text-red-400 rounded-full transition"><X size={12}/></button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <div className="flex items-end gap-2 w-full">
+                <div className="flex flex-col flex-1 bg-white/5 rounded-3xl px-4 py-2 border border-transparent transition-all duration-300">
+                  <textarea 
+                    ref={inputRef} value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}}} 
+                    placeholder="Message Cortex..." className="w-full bg-transparent resize-none outline-none text-[15.5px] min-h-[44px] max-h-40 py-2.5 custom-scrollbar text-white placeholder:text-gray-500 font-medium" 
+                  />
+                  <div className="flex items-center gap-2 mt-1 pb-1">
+                    <button onClick={handleVoice} className="w-8 h-8 flex items-center justify-center rounded-full text-gray-500 hover:text-cortex-purple hover:bg-white/5 transition" title="Voice Input"><Mic size={18}/></button>
+                    <button onClick={()=>send("image")} className="w-8 h-8 flex items-center justify-center rounded-full text-gray-500 hover:text-cortex-purple hover:bg-white/5 transition" title="Generate Image"><ImageIcon size={18}/></button>
+                    <label htmlFor="fileup" className="w-8 h-8 flex items-center justify-center rounded-full text-gray-500 hover:text-cortex-purple hover:bg-white/5 transition cursor-pointer" title="Attach File/Image"><Paperclip size={18}/></label>
+                    <input type="file" id="fileup" className="hidden" accept=".txt,.md,.csv,.png,.jpg,.jpeg" onChange={handleFile} />
+                    
+                    <div className="w-px h-4 bg-white/10 mx-1"></div>
+                    <button onClick={()=>setWebSearchEnabled(!webSearchEnabled)} className={`px-3 h-8 flex items-center gap-1.5 text-xs font-bold rounded-full transition ${webSearchEnabled ? 'text-blue-400 bg-blue-500/10 border border-blue-500/20' : 'text-gray-500 hover:text-white hover:bg-white/5 border border-transparent'}`} title="Toggle Web Search">
+                      <Globe size={14}/> {webSearchEnabled ? 'Search On' : 'Search'}
+                    </button>
+                  </div>
+                </div>
+                
+                {loading ? (
+                  <button onClick={stopGenerating} className="w-12 h-12 mb-1 shrink-0 bg-white text-black rounded-[1.2rem] flex items-center justify-center hover:bg-gray-200 transition-all shadow-lg hover:scale-105 active:scale-95">
+                    <StopCircle size={20} className="text-red-500" />
+                  </button>
+                ) : (
+                  <button onClick={()=>send()} disabled={(!input.trim() && !attachedFile)} className="w-12 h-12 mb-1 shrink-0 bg-white disabled:bg-white/10 disabled:text-gray-600 disabled:shadow-none text-black rounded-[1.2rem] flex items-center justify-center hover:bg-gray-200 transition-all shadow-[0_0_15px_rgba(255,255,255,0.2)] hover:scale-105 active:scale-95">
+                    <Send size={20} className="-ml-0.5" />
+                  </button>
+                )}
+              </div>
+            </motion.div>
+            <div className="text-center mt-3"><span className="text-[11px] text-gray-500 font-semibold flex items-center justify-center gap-1.5"><Check size={12} className="text-cortex-purple"/> End-to-end encrypted • Cortex Advanced 2.0</span></div>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
