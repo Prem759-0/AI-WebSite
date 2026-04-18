@@ -21,12 +21,13 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      {/* Hero Section */}
-      <section className="relative pt-32 pb-20 md:pt-48 md:pb-32 px-6 flex flex-col items-center text-center">
+      {/* Hero Section - Reduced Top Padding to close the gap */}
+      <section className="relative pt-24 pb-16 md:pt-32 md:pb-24 px-6 flex flex-col items-center text-center">
         {/* Ambient Background Glow */}
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-cortex-purple/20 rounded-full blur-[120px] pointer-events-none -z-10" />
         
-        <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 1, ease: "easeOut" }} className="w-48 h-48 md:w-64 md:h-64 mb-8 mix-blend-screen">
+        {/* Reduced margin-bottom here to pull text up closer to the GIF */}
+        <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 1, ease: "easeOut" }} className="w-48 h-48 md:w-64 md:h-64 mb-4 mix-blend-screen">
           <img src="/ai_logo_video.gif" alt="Cortex AI" className="w-full h-full object-contain scale-[1.2]" />
         </motion.div>
 
