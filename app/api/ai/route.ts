@@ -38,9 +38,9 @@ export async function POST(req: Request) {
     });
 
     // 2. Auto-Switch to a free Vision model if an image is detected!
-    // Standard text models crash if given image objects, so we safely override here.
+    // Using a more stable free Gemini model ID that OpenRouter supports
     if (hasImage) {
-      activeModel = "google/gemini-2.0-flash-lite-preview-02-05:free";
+      activeModel = "google/gemini-2.0-flash-exp:free";
     }
 
     // 3. Inject Web Search System Prompt (if toggled and no image)
