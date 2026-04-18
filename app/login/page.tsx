@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion"; // <-- Fixed import here
 import { Sparkles, ArrowRight, Loader2, Mail, Lock } from "lucide-react";
 
 export default function LoginPage() {
