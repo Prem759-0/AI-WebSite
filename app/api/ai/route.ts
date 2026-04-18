@@ -1,20 +1,20 @@
 import { NextResponse } from "next/server";
 
-// --- NEW: Live Web Scraper Engine ---
-// This allows the AI to read online articles, docs, and websites instantly.
+// --- LIVE WEB SCRAPER ENGINE ---
+// This fetches text from live URLs pasted in the chat
 async function fetchWebContext(url: string) {
   try {
     const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
     const html = await res.text();
     
-    // Clean the HTML to get pure readable text
+    // Clean HTML to get pure readable text
     const cleanText = html
       .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
       .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, "")
       .replace(/<[^>]+>/g, " ")
       .replace(/\s+/g, " ")
       .trim()
-      .substring(0, 20000); // Send up to 20,000 characters to the AI
+      .substring(0, 20000); // Limit to 20k characters to prevent overflow
 
     return cleanText;
   } catch (e) {
@@ -32,7 +32,7 @@ export async function POST(req: Request) {
     let activeModel = forceModel || "openrouter/free";
     let hasImage = false;
 
-    // Process all messages: Handle Images and Live URLs
+    // Process messages: Scrape URLs and Format Images
     const finalMessages = await Promise.all(messages.map(async (msg: any) => {
       if (msg.role === "user") {
         let content = msg.content;
@@ -42,13 +42,13 @@ export async function POST(req: Request) {
         const urls = content.match(urlRegex);
         
         if (urls && urls.length > 0) {
+          // Scrape the first URL found in the prompt
           const urlToScrape = urls[0];
           const scrapedText = await fetchWebContext(urlToScrape);
-          // Inject the scraped data seamlessly into the prompt
           content = `[LIVE WEBPAGE DATA FROM ${urlToScrape}]:\n${scrapedText}\n\n[USER QUESTION]:\n${content}`;
         }
 
-        // 2. Detect and Format Uploaded Images for Vision Models
+        // 2. Detect Images for Vision Models
         if (content.includes("data:image")) {
           hasImage = true;
           const base64Match = content.match(/(data:image\/[^;]+;base64,[a-zA-Z0-9+/=]+)/);
@@ -71,12 +71,12 @@ export async function POST(req: Request) {
       return msg;
     }));
 
-    // Auto-Switch to a stable Vision model if an image is detected
+    // Auto-Switch to Vision model if image is present
     if (hasImage) {
       activeModel = "google/gemini-2.0-flash-exp:free";
     }
 
-    // Apply Web Search prompt if user explicitly toggled it
+    // Apply Web Search prompt if toggled
     if (webSearch && !hasImage) {
       finalMessages.unshift({
         role: "system",
