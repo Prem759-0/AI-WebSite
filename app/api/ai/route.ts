@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { MODEL_MAP, detectIntent } from "@/lib/ai-router";
 
 export async function POST(req: Request) {
   try {
@@ -7,26 +6,48 @@ export async function POST(req: Request) {
     if (!apiKey) return new Response("API Key Missing", { status: 500 });
 
     const { messages, forceModel, webSearch } = await req.json();
-    
-    // 1. Model Selection Logic
-    let activeModel = "openrouter/free";
-    
-    if (forceModel && forceModel !== "auto") {
-      // User manually selected a specific persona
-      activeModel = forceModel;
-    } else {
-      // Auto-detect based on intent
-      const lastMsg = messages[messages.length - 1]?.content || "";
-      const intent = detectIntent(lastMsg);
-      activeModel = MODEL_MAP[intent] || "openrouter/free";
+
+    let activeModel = forceModel || "openrouter/free";
+    let hasImage = false;
+
+    // 1. Format messages for Vision Models if an image is attached
+    const finalMessages = messages.map((msg: any) => {
+      // Check if the user's message contains our Base64 image data
+      if (msg.role === "user" && msg.content.includes("data:image")) {
+        hasImage = true;
+
+        // Extract the base64 image string safely
+        const base64Match = msg.content.match(/(data:image\/[^;]+;base64,[a-zA-Z0-9+/=]+)/);
+        
+        // Extract the user's actual text prompt
+        const textParts = msg.content.split("[User Request]: ");
+        const actualPrompt = textParts.length > 1 ? textParts[1].trim() : "Analyze this image.";
+
+        if (base64Match) {
+          // Return the specific formatting that Vision Models require
+          return {
+            role: "user",
+            content: [
+              { type: "text", text: actualPrompt },
+              { type: "image_url", image_url: { url: base64Match[0] } }
+            ]
+          };
+        }
+      }
+      return msg;
+    });
+
+    // 2. Auto-Switch to a free Vision model if an image is detected!
+    // Standard text models crash if given image objects, so we safely override here.
+    if (hasImage) {
+      activeModel = "google/gemini-2.0-flash-lite-preview-02-05:free";
     }
 
-    // 2. Inject Web Search System Prompt (if toggled)
-    let finalMessages = [...messages];
-    if (webSearch) {
+    // 3. Inject Web Search System Prompt (if toggled and no image)
+    if (webSearch && !hasImage) {
       finalMessages.unshift({
         role: "system",
-        content: "You are connected to the web. The user expects up-to-date, factual information. Simulate web search results in your response."
+        content: "You are connected to the web. Provide up-to-date, factual information. Simulate web search results."
       });
     }
 
