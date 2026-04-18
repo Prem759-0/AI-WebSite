@@ -3,8 +3,8 @@
 @tailwind utilities;
 
 :root {
-  --background: #fcfcfd;
-  --foreground: #09090b;
+  --background: #000000; /* Pure black background for the video effect */
+  --foreground: #ffffff;
 }
 
 body {
@@ -14,13 +14,12 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Beautiful Text Selection */
 ::selection {
   background-color: #a87ffb;
   color: white;
 }
 
-/* Premium Apple-Style Custom Scrollbar */
+/* Premium Dark Scrollbar */
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -29,62 +28,63 @@ body {
   background: transparent;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.1);
+  background: rgba(255, 255, 255, 0.1);
   border-radius: 10px;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.2);
+  background: rgba(255, 255, 255, 0.2);
 }
 
-/* --- THE NEW 3D CORTEX ORB --- */
+/* --- THE NEW FLUID VIDEO ORB --- */
 .cortex-orb {
-  width: 84px;
-  height: 84px;
+  width: 100px;
+  height: 100px;
   border-radius: 50%;
   position: relative;
-  /* The main 3D glass body */
-  background: linear-gradient(135deg, #a87ffb 0%, #4f46e5 100%);
+  background: #000000;
+  /* Outer glass sphere reflection and glow */
   box-shadow: 
-    0 15px 35px rgba(168, 127, 251, 0.5), 
-    inset 0 -10px 20px rgba(0, 0, 0, 0.2), 
-    inset 0 10px 20px rgba(255, 255, 255, 0.5);
-  animation: float-orb 4s ease-in-out infinite;
+    0 0 30px rgba(123, 66, 246, 0.4),
+    inset 0 0 20px rgba(168, 127, 251, 0.8),
+    inset 0 0 10px rgba(0, 240, 255, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
   z-index: 10;
 }
 
-/* The spinning energy aura behind the orb */
+/* The glowing purple/blue ring outline */
 .cortex-orb::before {
   content: '';
   position: absolute;
-  inset: -12px;
+  inset: -2px;
   border-radius: 50%;
-  background: conic-gradient(from 0deg, transparent, #a87ffb, #4f46e5, #a87ffb, transparent);
-  filter: blur(16px);
-  animation: spin-orb 4s linear infinite;
+  background: linear-gradient(180deg, #7b42f6, #00f0ff);
   z-index: -1;
-  opacity: 0.8;
+  filter: blur(4px);
+  animation: spin 4s linear infinite;
 }
 
-/* The glossy light reflection on top of the orb */
+/* The inner morphing, fluid white/blue wave (matches the video) */
 .cortex-orb::after {
   content: '';
   position: absolute;
-  top: 12%;
-  left: 15%;
-  width: 35%;
-  height: 35%;
-  background: white;
-  border-radius: 50%;
-  filter: blur(4px);
-  opacity: 0.6;
+  width: 65%;
+  height: 65%;
+  background: radial-gradient(circle at center, #ffffff 0%, #a87ffb 50%, #00f0ff 90%, transparent 100%);
+  /* Creates the organic, fluid shape */
+  border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%;
+  animation: morph 3s ease-in-out infinite alternate, spin 6s linear infinite;
+  filter: blur(3px) drop-shadow(0 0 15px #ffffff);
+  opacity: 0.95;
 }
 
-@keyframes float-orb {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-12px); }
+@keyframes morph {
+  0% { border-radius: 40% 60% 70% 30% / 40% 40% 60% 50%; transform: scale(1); }
+  100% { border-radius: 58% 42% 40% 60% / 50% 60% 40% 50%; transform: scale(1.15); }
 }
 
-@keyframes spin-orb {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+@keyframes spin {
+  100% { transform: rotate(360deg); }
 }
