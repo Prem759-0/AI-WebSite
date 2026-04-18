@@ -11,7 +11,12 @@ const inter = Inter({
 export const metadata = {
   title: "Cortex AI | Advanced Intelligence",
   description: "Next-generation AI assistant powered by advanced models.",
-  themeColor: "#050505",
+  themeColor: "#000000",
+  // This tells the browser to use your animated GIF as the tab icon!
+  icons: {
+    icon: "/ai_logo_video.gif",
+    apple: "/ai_logo_video.gif", // Also sets it for Apple devices if saved to home screen
+  },
 };
 
 export default function RootLayout({
@@ -21,10 +26,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      {/* Removed 'overflow-hidden' from the body tag so the landing page can scroll.
-        Updated global background to #050505 (Deep Black) to match the dark UI. 
-      */}
-      <body className={`${inter.className} bg-[#050505] text-white antialiased`}>
+      <body className={`${inter.className} bg-[#000000] text-white antialiased`}>
         {children}
       </body>
     </html>
