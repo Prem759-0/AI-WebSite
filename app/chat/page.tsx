@@ -5,8 +5,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   Plus, Search, Download, Settings, Mic, Paperclip, Send, Loader2, Image as ImageIcon, 
   Lightbulb, Sparkles, LogOut, PanelLeftClose, PanelLeft, Copy, Check, RefreshCw, StopCircle, 
-  ChevronDown, Globe, FileText, AlertCircle, ArrowDown, Eraser, AlignLeft, X,
-  Star, Wand2, Share2, Database, ThumbsUp, ThumbsDown, MoreHorizontal, Mail, Code, AlertTriangle, Volume2, Edit2, Trash2
+  ChevronDown, Globe, FileText, AlertCircle, ArrowDown, AlignLeft, X,
+  Star, Wand2, Share2, Database, ThumbsUp, ThumbsDown, MoreHorizontal, Mail, Code, AlertTriangle, Volume2, Edit2, Trash2, Eye, Code2
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
@@ -158,12 +158,6 @@ export default function ChatApp() {
   };
 
   const newChat = () => { setActiveId(null); setMessages([]); setView("chat"); setAttachedFile(null); if (window.innerWidth < 768) setSidebarOpen(false); };
-
-  const clearContext = () => {
-    if (!confirm("Clear this conversation's memory?")) return;
-    setMessages([]);
-    showToast("Chat memory cleared");
-  };
 
   const toggleStar = (id: string) => {
     setChats(chats.map(c => c._id === id ? { ...c, starred: !c.starred } : c));
@@ -335,34 +329,78 @@ export default function ChatApp() {
 
   const filteredChats = chats.filter(c => c.title.toLowerCase().includes(search.toLowerCase()));
 
-  const renderers = {
-    code: (props: any) => {
-      const { node, inline, className, children, ...rest } = props;
-      const match = /language-(\w+)/.exec(className || '');
-      const codeString = String(children).replace(/\n$/, '');
-      const codeId = Math.random().toString(36).substring(7);
+  // 🚀 ADVANCED CODE PREVIEW COMPONENT 🚀
+  const CodeBlock = ({ inline, className, children }: any) => {
+    const [viewMode, setViewMode] = useState<'code' | 'preview'>('code');
+    const match = /language-(\w+)/.exec(className || '');
+    const lang = match ? match[1] : '';
+    const codeString = String(children).replace(/\n$/, '');
+    const codeId = Math.random().toString(36).substring(7);
+    
+    // Only allow preview for web languages
+    const isPreviewable = ['html', 'svg', 'xml'].includes(lang.toLowerCase());
 
-      if (!inline && match) {
-        return (
-          <div className="relative my-4 md:my-5 rounded-xl md:rounded-2xl overflow-hidden bg-[#0d0d0f] border border-white/10 shadow-2xl w-full max-w-full">
-            <div className="flex items-center justify-between px-3 md:px-4 py-2 bg-[#16161a] border-b border-white/5">
-              <span className="text-gray-400 text-[10px] md:text-xs font-medium uppercase tracking-wider">{match[1]}</span>
-              <button onClick={() => handleCopy(codeString, codeId)} className="text-gray-400 hover:text-white transition flex items-center gap-1.5 text-[10px] md:text-xs font-medium bg-white/5 hover:bg-white/10 px-2 py-1 rounded-md">
-                {copied === codeId ? <><Check size={12}/> Copied</> : <><Copy size={12}/> Copy</>}
-              </button>
+    if (!inline && match) {
+      return (
+        <div className="relative my-4 md:my-6 rounded-xl md:rounded-2xl overflow-hidden bg-[#0d0d0f] border border-white/10 shadow-2xl w-full max-w-full">
+          {/* Header Bar */}
+          <div className="flex items-center justify-between px-3 md:px-4 py-2.5 bg-[#16161a] border-b border-white/5">
+            <div className="flex items-center gap-4">
+              <div className="flex gap-1.5 mr-2">
+                <div className="w-3 h-3 rounded-full bg-[#ff5f56]"></div>
+                <div className="w-3 h-3 rounded-full bg-[#ffbd2e]"></div>
+                <div className="w-3 h-3 rounded-full bg-[#27c93f]"></div>
+              </div>
+              
+              {/* Preview Toggle Buttons */}
+              {isPreviewable && (
+                <div className="flex bg-black/50 rounded-lg p-0.5 border border-white/5">
+                  <button onClick={() => setViewMode('code')} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] md:text-xs font-bold transition ${viewMode === 'code' ? 'bg-[#2a2a35] text-white shadow-sm' : 'text-gray-500 hover:text-gray-300'}`}><Code2 size={12}/> Code</button>
+                  <button onClick={() => setViewMode('preview')} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] md:text-xs font-bold transition ${viewMode === 'preview' ? 'bg-[#2a2a35] text-white shadow-sm' : 'text-gray-500 hover:text-gray-300'}`}><Eye size={12}/> Preview</button>
+                </div>
+              )}
+              {!isPreviewable && <span className="text-gray-400 text-[10px] md:text-xs font-bold uppercase tracking-wider">{lang}</span>}
             </div>
-            <div className="p-3 md:p-5 overflow-x-auto custom-scrollbar">
-              <code className={`${className} text-gray-200 text-[13px] md:text-[14px] font-mono leading-relaxed whitespace-pre`} {...rest}>{children}</code>
-            </div>
+
+            <button onClick={() => handleCopy(codeString, codeId)} className="text-gray-400 hover:text-white transition flex items-center gap-1.5 text-[10px] md:text-xs font-medium bg-white/5 hover:bg-white/10 px-2.5 py-1.5 rounded-lg">
+              {copied === codeId ? <><Check size={14} className="text-green-500"/> Copied</> : <><Copy size={14}/> Copy</>}
+            </button>
           </div>
-        );
-      }
-      return <code className="bg-cortex-purple/10 text-[#a87ffb] px-1.5 py-0.5 rounded-md font-mono text-[13px]" {...rest}>{children}</code>;
+
+          {/* Content Area */}
+          <div className="relative bg-[#0d0d0f]">
+            {viewMode === 'code' ? (
+              <div className="p-4 md:p-6 overflow-x-auto custom-scrollbar">
+                <code className={`token ${className} text-gray-300 text-[13px] md:text-[14px] font-mono leading-relaxed whitespace-pre`}>{children}</code>
+              </div>
+            ) : (
+              <div className="bg-white w-full h-[400px] overflow-hidden">
+                <iframe srcDoc={codeString} title="Preview" sandbox="allow-scripts" className="w-full h-full border-none bg-white"/>
+              </div>
+            )}
+          </div>
+        </div>
+      );
     }
+    return <code className="bg-cortex-purple/10 text-[#a87ffb] px-1.5 py-0.5 rounded-md font-mono text-[13px] font-semibold">{children}</code>;
+  };
+
+  const renderers = {
+    code: CodeBlock,
+    // Advanced Image Renderer with Lightbox effect
+    img: (props: any) => (
+      <div className="relative overflow-hidden rounded-2xl border border-white/10 shadow-2xl my-4 group max-w-md w-full">
+        <img {...props} className="w-full h-auto object-cover transform transition duration-700 group-hover:scale-105" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-start p-4">
+          <span className="text-white text-xs font-bold flex items-center gap-1.5"><ImageIcon size={14}/> Generated by Cortex</span>
+        </div>
+      </div>
+    )
   };
 
   return (
-    <div className="h-[100dvh] w-full bg-black md:p-4 flex gap-4 overflow-hidden font-sans text-white relative">
+    // Changed to Pure Black background to match the GIF perfectly
+    <div className="h-[100dvh] w-full bg-[#000000] md:p-4 flex gap-4 overflow-hidden font-sans text-white relative">
       
       <AnimatePresence>
         {toast && (
@@ -445,9 +483,9 @@ export default function ChatApp() {
         )}
       </AnimatePresence>
 
-      <main className="flex-1 bg-[#0a0a0c] md:rounded-[2rem] border-x md:border border-white/10 flex flex-col relative overflow-hidden h-[100dvh] md:h-full w-full">
+      <main className="flex-1 bg-[#000000] md:rounded-[2rem] border-x md:border border-white/10 flex flex-col relative overflow-hidden h-[100dvh] md:h-full w-full">
         
-        <header className="h-14 md:h-16 flex items-center justify-between px-4 md:px-6 border-b border-white/5 bg-[#0a0a0c]/90 backdrop-blur-xl z-20 shrink-0 w-full">
+        <header className="h-14 md:h-16 flex items-center justify-between px-4 md:px-6 border-b border-white/5 bg-[#000000]/80 backdrop-blur-xl z-20 shrink-0 w-full">
           <div className="flex items-center gap-2">
             {!sidebarOpen && <button onClick={() => setSidebarOpen(true)} className="p-2 -ml-2 hover:bg-white/10 rounded-xl text-gray-400 hover:text-white transition"><AlignLeft size={22}/></button>}
             
@@ -477,9 +515,12 @@ export default function ChatApp() {
           <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto px-4 md:px-8 pt-6 pb-[200px] md:pb-40 custom-scrollbar w-full relative z-0">
             {messages.length === 0 ? (
               <div className="max-w-2xl mx-auto flex flex-col items-center mt-8 md:mt-20 text-center w-full">
+                
+                {/* The Pure Black background makes the GIF perfectly seamless */}
                 <div className="w-32 h-32 md:w-48 md:h-48 mb-6 md:mb-8 relative flex items-center justify-center mix-blend-screen pointer-events-none">
                   <img src="/ai_logo_video.gif" alt="Cortex AI" className="w-full h-full object-contain scale-[1.2]" />
                 </div>
+
                 <h1 className="text-3xl md:text-5xl font-bold tracking-tight mb-8 text-white px-2">How can I help you?</h1>
                 <div className="flex flex-col sm:grid sm:grid-cols-3 gap-3 md:gap-4 w-full max-w-3xl mt-4 px-2">
                   {[{i:<ImageIcon size={20}/>,t:"Generate Image",d:"A cyberpunk city at night", m:"image"}, {i:<Lightbulb size={20}/>,t:"Write Code",d:"Create a React login form", m:"text"}, {i:<Globe size={20}/>,t:"Web Search",d:"Latest AI news today", m:"text", w:true}].map((c,i)=>(
@@ -512,6 +553,7 @@ export default function ChatApp() {
                         </div>
                       )}
 
+                      {/* ADVANCED AI MESSAGE ACTION BAR */}
                       {!loading && m.content !== "" && m.role === "assistant" && (
                         <div className={`absolute bottom-[-40px] left-0 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-10`}>
                           
@@ -553,7 +595,6 @@ export default function ChatApp() {
                            <button onClick={() => { setEditingMsgIndex(i); setEditMsgContent(m.content.replace(/\[Attached Image:.*?\]\ndata:image\/[^\n]+\n\n\[User Request\]: /, '')); }} className="p-1.5 text-gray-500 hover:text-white rounded-lg bg-[#121214] border border-white/10 shadow-sm transition"><Edit2 size={12}/></button>
                         </div>
                       )}
-
                     </div>
                   </motion.div>
                 ))}
@@ -578,14 +619,9 @@ export default function ChatApp() {
                 </motion.button>
               )}
             </AnimatePresence>
-            {messages.length > 0 && !loading && (
-              <motion.button initial={{ opacity: 0 }} animate={{ opacity: 1 }} onClick={clearContext} className="w-10 h-10 bg-[#1e1e24] border border-white/10 rounded-full shadow-lg flex items-center justify-center text-gray-400 hover:text-red-400 transition" title="Clear Memory">
-                <Eraser size={18}/>
-              </motion.button>
-            )}
           </div>
 
-          <div className="absolute bottom-0 md:bottom-6 left-0 md:left-1/2 md:-translate-x-1/2 w-full md:max-w-3xl px-2 md:px-4 pb-4 pt-2 md:py-0 z-40 bg-gradient-to-t from-[#0a0a0c] via-[#0a0a0c]/90 to-transparent md:bg-none">
+          <div className="absolute bottom-0 md:bottom-6 left-0 md:left-1/2 md:-translate-x-1/2 w-full md:max-w-3xl px-2 md:px-4 pb-4 pt-2 md:py-0 z-40 bg-gradient-to-t from-[#000000] via-[#000000]/90 to-transparent md:bg-none">
             <div className={`bg-[#121214]/90 md:bg-[#0f0f13] border shadow-2xl rounded-[1.5rem] md:rounded-[2rem] p-1.5 md:p-2 flex flex-col gap-2 backdrop-blur-3xl transition-all duration-300 w-full ${loading ? 'border-cortex-purple/50' : 'border-white/10 focus-within:border-cortex-purple/50'}`}>
               
               <AnimatePresence>
