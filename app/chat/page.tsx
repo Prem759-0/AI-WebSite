@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   Plus, Search, Download, Settings, Mic, Paperclip, Send, Loader2, Image as ImageIcon, 
   Lightbulb, Sparkles, LogOut, PanelLeftClose, PanelLeft, Copy, Check, RefreshCw, StopCircle, 
-  ChevronDown, Globe, FileText, AlertCircle, ArrowDown, Eraser, AlignLeft
+  ChevronDown, Globe, FileText, AlertCircle, ArrowDown, Eraser, AlignLeft, X
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
@@ -26,7 +26,7 @@ export default function ChatApp() {
   const [messages, setMessages] = useState<Array<Message>>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false); // Mobile defaults to closed
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [user, setUser] = useState({ name: "User", email: "" });
   const [copied, setCopied] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -86,11 +86,9 @@ export default function ChatApp() {
     setShowScrollButton(!isNearBottom);
   };
 
-  // MOBILE RESPONSIVE AUTO-RESIZE
   const autoResizeInput = () => {
     if (inputRef.current) {
       inputRef.current.style.height = 'auto';
-      // Max height 150px on mobile, 250px on desktop
       const maxHeight = window.innerWidth < 768 ? 120 : 250;
       inputRef.current.style.height = `${Math.min(inputRef.current.scrollHeight, maxHeight)}px`;
     }
@@ -326,7 +324,6 @@ export default function ChatApp() {
         </header>
 
         <div className="flex-1 flex flex-col relative bg-transparent overflow-hidden">
-          {/* Scroll Area Needs Huge Bottom Padding for Mobile Input */}
           <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto px-4 md:px-8 pt-6 pb-[200px] md:pb-40 custom-scrollbar w-full">
             {messages.length === 0 ? (
               <div className="max-w-2xl mx-auto flex flex-col items-center mt-8 md:mt-20 text-center w-full">
