@@ -36,28 +36,55 @@ body {
   background: rgba(0, 0, 0, 0.2);
 }
 
-/* The Cortex AI Orb Animation */
+/* --- THE NEW 3D CORTEX ORB --- */
 .cortex-orb {
-  width: 80px;
-  height: 80px;
+  width: 84px;
+  height: 84px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #a87ffb 0%, #7b42f6 100%);
   position: relative;
-  box-shadow: 0 0 40px rgba(168, 127, 251, 0.4);
+  /* The main 3D glass body */
+  background: linear-gradient(135deg, #a87ffb 0%, #4f46e5 100%);
+  box-shadow: 
+    0 15px 35px rgba(168, 127, 251, 0.5), 
+    inset 0 -10px 20px rgba(0, 0, 0, 0.2), 
+    inset 0 10px 20px rgba(255, 255, 255, 0.5);
+  animation: float-orb 4s ease-in-out infinite;
+  z-index: 10;
 }
 
+/* The spinning energy aura behind the orb */
 .cortex-orb::before {
   content: '';
   position: absolute;
-  inset: -5px;
+  inset: -12px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #a87ffb 0%, #7b42f6 100%);
-  filter: blur(15px);
-  opacity: 0.6;
-  animation: pulse-glow 3s ease-in-out infinite alternate;
+  background: conic-gradient(from 0deg, transparent, #a87ffb, #4f46e5, #a87ffb, transparent);
+  filter: blur(16px);
+  animation: spin-orb 4s linear infinite;
+  z-index: -1;
+  opacity: 0.8;
 }
 
-@keyframes pulse-glow {
-  0% { transform: scale(0.95); opacity: 0.5; }
-  100% { transform: scale(1.1); opacity: 0.8; }
+/* The glossy light reflection on top of the orb */
+.cortex-orb::after {
+  content: '';
+  position: absolute;
+  top: 12%;
+  left: 15%;
+  width: 35%;
+  height: 35%;
+  background: white;
+  border-radius: 50%;
+  filter: blur(4px);
+  opacity: 0.6;
+}
+
+@keyframes float-orb {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-12px); }
+}
+
+@keyframes spin-orb {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
