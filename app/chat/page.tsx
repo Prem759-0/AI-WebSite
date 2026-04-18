@@ -24,6 +24,7 @@ const MODELS = [
 ];
 
 export default function ChatApp() {
+  // Safe generic declarations for SWC Compiler
   const [chats, setChats] = useState< Array<ChatInfo> >([]);
   const [activeId, setActiveId] = useState< string | null >(null);
   const [messages, setMessages] = useState< Array<Message> >([]);
@@ -272,6 +273,7 @@ export default function ChatApp() {
 
   const filteredChats = chats.filter(c => c.title.toLowerCase().includes(search.toLowerCase()));
 
+  // 100% Compiler-Safe Renderers using an arrow function directly
   const renderers = {
     code: (props: any) => {
       const { node, inline, className, children, ...rest } = props;
@@ -421,17 +423,13 @@ export default function ChatApp() {
             {messages.length === 0 ? (
               <div className="max-w-2xl mx-auto flex flex-col items-center mt-10 md:mt-20 text-center">
                 
-                {/* --- VIDEO ORB INTEGRATION HERE --- */}
+                {/* --- GIF ORB INTEGRATION HERE --- */}
                 <div className="w-48 h-48 mb-8 relative flex items-center justify-center mix-blend-screen pointer-events-none">
-                  <video 
-                    autoPlay 
-                    loop 
-                    muted 
-                    playsInline 
-                    className="w-full h-full object-contain scale-[1.1]"
-                  >
-                    <source src="/ai_logo_video.mp4" type="video/mp4" />
-                  </video>
+                  <img 
+                    src="/ai_logo_video.gif" 
+                    alt="Cortex AI"
+                    className="w-full h-full object-contain scale-[1.2]"
+                  />
                 </div>
                 {/* ---------------------------------- */}
 
