@@ -1,5 +1,27 @@
 import { NextResponse } from "next/server";
 
+// --- NEW: Live Web Scraper Engine ---
+// This allows the AI to read online articles, docs, and websites instantly.
+async function fetchWebContext(url: string) {
+  try {
+    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+    const html = await res.text();
+    
+    // Clean the HTML to get pure readable text
+    const cleanText = html
+      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
+      .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, "")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .substring(0, 20000); // Send up to 20,000 characters to the AI
+
+    return cleanText;
+  } catch (e) {
+    return "Failed to read the live webpage. It might be blocked or private.";
+  }
+}
+
 export async function POST(req: Request) {
   try {
     const apiKey = process.env.OPENROUTER_API_KEY;
@@ -10,44 +32,55 @@ export async function POST(req: Request) {
     let activeModel = forceModel || "openrouter/free";
     let hasImage = false;
 
-    // 1. Format messages for Vision Models if an image is attached
-    const finalMessages = messages.map((msg: any) => {
-      // Check if the user's message contains our Base64 image data
-      if (msg.role === "user" && msg.content.includes("data:image")) {
-        hasImage = true;
+    // Process all messages: Handle Images and Live URLs
+    const finalMessages = await Promise.all(messages.map(async (msg: any) => {
+      if (msg.role === "user") {
+        let content = msg.content;
 
-        // Extract the base64 image string safely
-        const base64Match = msg.content.match(/(data:image\/[^;]+;base64,[a-zA-Z0-9+/=]+)/);
+        // 1. Detect and Read Online Links (URLs)
+        const urlRegex = /(https?:\/\/[^\s]+)/g;
+        const urls = content.match(urlRegex);
         
-        // Extract the user's actual text prompt
-        const textParts = msg.content.split("[User Request]: ");
-        const actualPrompt = textParts.length > 1 ? textParts[1].trim() : "Analyze this image.";
-
-        if (base64Match) {
-          // Return the specific formatting that Vision Models require
-          return {
-            role: "user",
-            content: [
-              { type: "text", text: actualPrompt },
-              { type: "image_url", image_url: { url: base64Match[0] } }
-            ]
-          };
+        if (urls && urls.length > 0) {
+          const urlToScrape = urls[0];
+          const scrapedText = await fetchWebContext(urlToScrape);
+          // Inject the scraped data seamlessly into the prompt
+          content = `[LIVE WEBPAGE DATA FROM ${urlToScrape}]:\n${scrapedText}\n\n[USER QUESTION]:\n${content}`;
         }
+
+        // 2. Detect and Format Uploaded Images for Vision Models
+        if (content.includes("data:image")) {
+          hasImage = true;
+          const base64Match = content.match(/(data:image\/[^;]+;base64,[a-zA-Z0-9+/=]+)/);
+          const textParts = content.split("[User Request]: ");
+          const actualPrompt = textParts.length > 1 ? textParts[1].trim() : content;
+
+          if (base64Match) {
+            return {
+              role: "user",
+              content: [
+                { type: "text", text: actualPrompt },
+                { type: "image_url", image_url: { url: base64Match[0] } }
+              ]
+            };
+          }
+        }
+        
+        return { ...msg, content };
       }
       return msg;
-    });
+    }));
 
-    // 2. Auto-Switch to a free Vision model if an image is detected!
-    // Using a more stable free Gemini model ID that OpenRouter supports
+    // Auto-Switch to a stable Vision model if an image is detected
     if (hasImage) {
       activeModel = "google/gemini-2.0-flash-exp:free";
     }
 
-    // 3. Inject Web Search System Prompt (if toggled and no image)
+    // Apply Web Search prompt if user explicitly toggled it
     if (webSearch && !hasImage) {
       finalMessages.unshift({
         role: "system",
-        content: "You are connected to the web. Provide up-to-date, factual information. Simulate web search results."
+        content: "You are an advanced AI. The user may have provided live data from a website. Analyze it deeply, format your response beautifully with Markdown, and answer factually."
       });
     }
 
